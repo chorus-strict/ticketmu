@@ -29,6 +29,10 @@ export const translations = {
     en: 'The pulse of premium events.',
     id: 'Pusat event premium.'
   },
+  'home.tagline': {
+    en: 'Curated Experiences for the Elite',
+    id: 'Pengalaman Terkurasi untuk Elit'
+  },
   'home.featured': {
     en: 'Featured Events',
     id: 'Event Unggulan'
@@ -144,6 +148,30 @@ export const translations = {
   'account.phone': {
     en: 'Phone Number',
     id: 'Nomor Telepon'
+  },
+  'checkout.buy_now': {
+    en: 'Buy Now',
+    id: 'Beli Sekarang'
+  },
+  'checkout.add_to_cart': {
+    en: 'Add to Cart',
+    id: 'Tambah Keranjang'
+  },
+  'checkout.add_more': {
+    en: 'Add More',
+    id: 'Tambah Lagi'
+  },
+  'checkout.adding': {
+    en: 'Adding...',
+    id: 'Menambahkan...'
+  },
+  'checkout.processing': {
+    en: 'Processing...',
+    id: 'Memproses...'
+  },
+  'checkout.denied': {
+    en: 'Access Denied',
+    id: 'Akses Ditolak'
   }
 };
 

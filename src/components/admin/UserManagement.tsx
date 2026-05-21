@@ -55,9 +55,9 @@ export default function UserManagement() {
 
   const { adjustUserPoints } = useManagement();
 
-  const filteredUsers = users.filter(u => {
-    const matchesSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         u.email.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredUsers = (users ?? []).filter(u => {
+    const matchesSearch = (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         (u.email || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = filterRole === 'ALL' || u.role === filterRole;
     const matchesMembership = filterMembership === 'ALL' || (
       filterMembership === 'PREMIUM' ? (u.membershipExpiredAt && new Date(u.membershipExpiredAt) > new Date()) :
@@ -151,6 +151,7 @@ export default function UserManagement() {
           >
             <option value="ALL">All Roles</option>
             <option value="ADMIN">Admins</option>
+            <option value="ORGANIZER">Organizers</option>
             <option value="USER">Users</option>
           </select>
 
@@ -221,6 +222,9 @@ export default function UserManagement() {
                   {user.role === 'ADMIN' && (
                     <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 rounded text-[8px] font-bold uppercase tracking-widest border border-indigo-100 dark:border-indigo-800/50">Admin</span>
                   )}
+                  {user.role === 'ORGANIZER' && (
+                    <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 rounded text-[8px] font-bold uppercase tracking-widest border border-emerald-100 dark:border-emerald-800/50">Organizer</span>
+                  )}
                   {user.membershipExpiredAt && (
                     <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest border flex items-center gap-0.5 ${
                       new Date(user.membershipExpiredAt) > new Date()
@@ -268,7 +272,9 @@ export default function UserManagement() {
                      // for the admin we might need a specific user fetch. 
                      // But for now let's assume we can fetch them via a query or reuse
                      const res = await api.get(`/points/logs?userId=${user.id}`);
-                     setPointHistory(res.data);
+                     const data = Array.isArray(res.data) ? res.data : [];
+                     const unique = data.filter((v: any, i: number, a: any[]) => a.findIndex(t => t.id === v.id) === i);
+                     setPointHistory(unique);
                    } catch (err) {
                      console.error('Failed to fetch user point history');
                    } finally {
@@ -331,7 +337,7 @@ export default function UserManagement() {
             </button>
             
             <div className="flex items-center gap-1 hidden sm:flex px-2">
-              {[...Array(userPagination.totalPages)].map((_, i) => (
+              {[...Array(Math.max(0, userPagination?.totalPages || 0))].map((_, i) => (
                 <button
                   key={i + 1}
                   onClick={() => handlePageChange(i + 1)}
@@ -435,7 +441,7 @@ export default function UserManagement() {
                             <input 
                               type="text" 
                               placeholder="Image URL..."
-                              value={editingUser.avatar}
+                              value={editingUser.avatar || ''}
                               onChange={(e) => setEditingUser({ ...editingUser, avatar: e.target.value })}
                               className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none"
                             />
@@ -467,7 +473,7 @@ export default function UserManagement() {
                     <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input 
                       type="text" 
-                      value={editingUser.name}
+                      value={editingUser.name || ''}
                       onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
                       className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all font-medium text-sm"
                     />
@@ -480,7 +486,7 @@ export default function UserManagement() {
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input 
                       type="email" 
-                      value={editingUser.email}
+                      value={editingUser.email || ''}
                       onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
                       className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all font-medium text-sm"
                     />
@@ -505,18 +511,19 @@ export default function UserManagement() {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Role</label>
                     <select 
-                      value={editingUser.role}
+                      value={editingUser.role || 'USER'}
                       onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as any })}
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all font-bold text-xs"
                     >
                       <option value="USER">User</option>
+                      <option value="ORGANIZER">Organizer</option>
                       <option value="ADMIN">Admin</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Membership</label>
                     <select 
-                      value={editingUser.membership}
+                      value={editingUser.membership || 'FREE'}
                       onChange={(e) => {
                         const val = e.target.value as any;
                         const updates: any = { membership: val };
@@ -731,9 +738,19 @@ export default function UserManagement() {
 
                 <button 
                   onClick={async () => {
-                    if (!adjustmentReason) return alert('Please enter a reason');
+                    const parsed = parseInt(adjustmentPoints, 10);
+                    if (isNaN(parsed) || parsed === 0) {
+                      return alert('Please enter a valid, non-zero adjustment amount.');
+                    }
+                    if (!adjustmentReason.trim()) {
+                      return alert('Reason/description is required.');
+                    }
+                    const currentBal = adjustingUser.points?.balance || 0;
+                    if (currentBal + parsed < 0) {
+                      return alert(`User only has ${currentBal} points. Deduction cannot result in a negative balance.`);
+                    }
                     try {
-                      await adjustUserPoints(adjustingUser.id, parseInt(adjustmentPoints), adjustmentReason);
+                      await adjustUserPoints(adjustingUser.id, parsed, adjustmentReason.trim());
                       setAdjustingUser(null);
                       setAdjustmentPoints('0');
                       setAdjustmentReason('');
@@ -741,8 +758,10 @@ export default function UserManagement() {
                       // Handled in context
                     }
                   }}
-                  className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-xl shadow-indigo-600/20 active:scale-95 transition-all text-sm uppercase tracking-widest italic"
+                  disabled={isLoading}
+                  className="w-full py-4 bg-indigo-600 disabled:opacity-50 text-white font-bold rounded-2xl shadow-xl shadow-indigo-600/20 active:scale-95 transition-all text-sm uppercase tracking-widest italic flex items-center justify-center gap-2"
                 >
+                  {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                   Confirm Adjustment
                 </button>
               </div>

@@ -33,7 +33,7 @@ class FavoriteService {
       include: {
         event: {
           include: {
-            author: { select: { name: true, id: true } },
+            organizer: { select: { name: true, id: true } },
             _count: { select: { tickets: true } }
           }
         },

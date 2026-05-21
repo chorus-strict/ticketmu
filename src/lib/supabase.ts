@@ -11,6 +11,7 @@ export const getSupabase = () => {
   // Check if configured and if it's not a placeholder
   const isConfigured = supabaseUrl && 
                       supabaseAnonKey && 
+                      supabaseUrl !== '' &&
                       !supabaseUrl.includes('[project-ref]') && 
                       supabaseUrl !== 'your-supabase-url';
 
@@ -24,12 +25,12 @@ export const getSupabase = () => {
     if (!url.protocol.startsWith('http')) {
       throw new Error('Supabase URL must start with http:// or https://');
     }
+    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
   } catch (err: any) {
-    console.error('[Supabase] Invalid URL format:', err.message);
+    console.error('[Supabase] Invalid initialization:', err.message);
     return null;
   }
 
-  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
   return supabaseInstance;
 };
 

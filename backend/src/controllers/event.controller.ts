@@ -55,7 +55,7 @@ export const createEvent = async (req: AuthRequest, res: Response) => {
 
 export const updateEvent = async (req: AuthRequest, res: Response) => {
   try {
-    const event = await eventService.update(req.params.id, req.body);
+    const event = await eventService.update(req.params.id, req.body, req.user!.id, req.user!.role);
     res.json(event);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -64,7 +64,7 @@ export const updateEvent = async (req: AuthRequest, res: Response) => {
 
 export const deleteEvent = async (req: AuthRequest, res: Response) => {
   try {
-    await eventService.delete(req.params.id);
+    await eventService.delete(req.params.id, req.user!.id, req.user!.role);
     res.status(204).send();
   } catch (error: any) {
     res.status(400).json({ message: error.message });

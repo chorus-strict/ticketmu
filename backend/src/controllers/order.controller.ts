@@ -4,8 +4,8 @@ import { AuthRequest } from '../middleware/auth';
 
 export const createOrder = async (req: AuthRequest, res: Response) => {
   try {
-    const { eventId, paymentMethodId, userRewardId } = req.body;
-    const order = await orderService.create(req.user!.id, eventId, paymentMethodId, userRewardId);
+    const { eventId, ticketTierId, paymentMethodId, userRewardId } = req.body;
+    const order = await orderService.create(req.user!.id, eventId, ticketTierId, paymentMethodId, userRewardId);
     res.status(201).json(order);
   } catch (error: any) {
     res.status(400).json({ message: error.message || 'Order creation failed' });
@@ -15,25 +15,38 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
 export const getOrders = async (req: AuthRequest, res: Response) => {
   try {
     if (req.user!.role === 'ADMIN') {
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 1000;
-      const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+      const limit = Number(req.query.limit) || 1000;
+      const offset = Number(req.query.offset) || 0;
       const result = await orderService.getAll(limit, offset);
       return res.json(result);
     }
     
+    if (req.user!.role === 'ORGANIZER') {
+      const orders = await orderService.getByOrganizer(req.user!.id);
+      return res.json({ orders, total: orders.length });
+    }
+    
     const orders = await orderService.getByUser(req.user!.id);
-    res.json(orders);
+    res.json({ orders, total: orders.length });
   } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    console.error('ERROR [OrderController.getOrders]:', {
+      name: error.name,
+      code: error.code,
+      message: error.message,
+      meta: error.meta,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      message: error.message || 'Internal Server Error',
+      shortMessage: error.name === 'PrismaClientKnownRequestError' ? `Prisma Error ${error.code}` : undefined,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+    });
   }
 };
 
 export const approveOrder = async (req: AuthRequest, res: Response) => {
   try {
-    if (req.user!.role !== 'ADMIN') {
-      return res.status(403).json({ message: 'Only admins can approve orders' });
-    }
-    const order = await orderService.approve(req.params.id);
+    const order = await orderService.approve(req.params.id, req.user!.id, req.user!.role);
     res.json(order);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
@@ -42,10 +55,7 @@ export const approveOrder = async (req: AuthRequest, res: Response) => {
 
 export const rejectOrder = async (req: AuthRequest, res: Response) => {
   try {
-    if (req.user!.role !== 'ADMIN') {
-      return res.status(403).json({ message: 'Only admins can reject orders' });
-    }
-    const order = await orderService.reject(req.params.id);
+    const order = await orderService.reject(req.params.id, req.user!.id, req.user!.role);
     res.json(order);
   } catch (error: any) {
     res.status(400).json({ message: error.message });

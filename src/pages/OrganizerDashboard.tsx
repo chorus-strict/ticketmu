@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
+  Building2,
   BarChart3, 
   Users,
   Package,
@@ -22,42 +23,48 @@ import TicketValidation from '../components/admin/TicketValidation';
 import TicketManagement from '../components/admin/TicketManagement';
 import PaymentManagement from '../components/admin/PaymentManagement';
 import MembershipManagement from '../components/admin/MembershipManagement';
+import OrganizerRequestManagement from '../components/admin/OrganizerRequestManagement';
 import PaymentSettings from '../components/admin/PaymentSettings';
 import RewardsManagement from '../components/admin/RewardsManagement';
 import { motion, AnimatePresence } from 'motion/react';
 import Layout from '../components/layout/Layout';
 
-type AdminTab = 'OVERVIEW' | 'USERS' | 'EVENTS' | 'TICKETS' | 'VALIDATE' | 'PAYMENTS' | 'MEMBERSHIP' | 'SETTINGS';
+type AdminTab = 'OVERVIEW' | 'USERS' | 'EVENTS' | 'TICKETS' | 'VALIDATE' | 'PAYMENTS' | 'MEMBERSHIP' | 'ORGANIZERS' | 'SETTINGS' | 'REWARDS';
 
 export default function OrganizerDashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<AdminTab>((searchParams.get('tab') as AdminTab) || 'OVERVIEW');
+  const [activeTab, setActiveTab] = useState<AdminTab>('OVERVIEW');
+
+  const allTabs = [
+    { id: 'OVERVIEW', label: 'Analytics', icon: BarChart3, desc: 'Real-time performance', roles: ['ADMIN', 'ORGANIZER'] },
+    { id: 'USERS', label: 'Audience', icon: Users, desc: 'User demographics', roles: ['ADMIN'] },
+    { id: 'EVENTS', label: 'Inventory', icon: Package, desc: 'Event management', roles: ['ADMIN', 'ORGANIZER'] },
+    { id: 'PAYMENTS', label: 'Orders', icon: BarChart3, desc: 'Payment verification', roles: ['ADMIN', 'ORGANIZER'] },
+    { id: 'ORGANIZERS', label: 'Merchants', icon: Building2, desc: 'Organizer requests', roles: ['ADMIN'] },
+    { id: 'MEMBERSHIP', label: 'Membership', icon: Crown, desc: 'Premium requests', roles: ['ADMIN'] },
+    { id: 'TICKETS', label: 'Passes', icon: TicketIcon, desc: 'Ticket management', roles: ['ADMIN', 'ORGANIZER'] },
+    { id: 'REWARDS', label: 'Rewards', icon: Coins, desc: 'Loyalty system logic', roles: ['ADMIN'] },
+    { id: 'SETTINGS', label: 'Finance', icon: Settings2, desc: 'Payment nodes', roles: ['ADMIN'] },
+    { id: 'VALIDATE', label: 'Validator', icon: QrCode, desc: 'Ticket scanner', roles: ['ADMIN', 'ORGANIZER'] }
+  ];
+
+  const tabs = allTabs.filter(tab => user && tab.roles.includes(user.role));
 
   useEffect(() => {
-    const tab = searchParams.get('tab') as AdminTab;
-    if (tab && ['OVERVIEW', 'USERS', 'EVENTS', 'TICKETS', 'VALIDATE', 'PAYMENTS', 'MEMBERSHIP', 'SETTINGS'].includes(tab)) {
-      setActiveTab(tab);
+    const tabParam = searchParams.get('tab') as AdminTab;
+    if (tabParam && tabs.some(t => t.id === tabParam)) {
+      setActiveTab(tabParam);
+    } else if (tabs.length > 0 && (!tabParam || !tabs.some(t => t.id === activeTab))) {
+      setActiveTab(tabs[0].id as AdminTab);
     }
-  }, [searchParams]);
+  }, [searchParams, user]);
 
   const handleTabChange = (tab: AdminTab) => {
     setActiveTab(tab);
     setSearchParams({ tab });
   };
-
-  const tabs = [
-    { id: 'OVERVIEW', label: 'Analytics', icon: BarChart3, desc: 'Real-time performance' },
-    { id: 'USERS', label: 'Audience', icon: Users, desc: 'User demographics' },
-    { id: 'EVENTS', label: 'Inventory', icon: Package, desc: 'Event management' },
-    { id: 'PAYMENTS', label: 'Orders', icon: BarChart3, desc: 'Payment verification' },
-    { id: 'MEMBERSHIP', label: 'Membership', icon: Crown, desc: 'Premium requests' },
-    { id: 'TICKETS', label: 'Passes', icon: TicketIcon, desc: 'Ticket management' },
-    { id: 'REWARDS', label: 'Rewards', icon: Coins, desc: 'Loyalty system logic' },
-    { id: 'SETTINGS', label: 'Finance', icon: Settings2, desc: 'Payment nodes' },
-    { id: 'VALIDATE', label: 'Validator', icon: QrCode, desc: 'Ticket scanner' }
-  ];
 
   return (
     <Layout>
@@ -154,6 +161,7 @@ export default function OrganizerDashboard() {
                      {activeTab === 'EVENTS' && <EventManagement />}
                      {activeTab === 'PAYMENTS' && <PaymentManagement />}
                      {activeTab === 'MEMBERSHIP' && <MembershipManagement />}
+                     {activeTab === 'ORGANIZERS' && <OrganizerRequestManagement />}
                      {activeTab === 'TICKETS' && <TicketManagement />}
                      {activeTab === 'REWARDS' && <RewardsManagement />}
                      {activeTab === 'SETTINGS' && <PaymentSettings />}

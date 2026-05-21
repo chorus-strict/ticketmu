@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { userService } from '../services/user.service';
 import { AuthRequest } from '../middleware/auth';
+import { prisma } from '../lib/prisma';
 
 export const getUsers = async (req: Request, res: Response) => {
   try {
@@ -26,9 +27,28 @@ export const updateUser = async (req: Request, res: Response) => {
 export const updateProfile = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { name, phone, avatar } = req.body;
+    const { name, phone, avatar, email } = req.body;
     
-    const user = await userService.update(userId, { name, phone, avatar });
+    // Only allow email change if user is ADMIN
+    const updateData: any = { name, phone, avatar };
+    if (email && req.user!.role === 'ADMIN') {
+      updateData.email = email;
+    }
+    
+    const user = await userService.update(userId, updateData);
+
+    // Create personal profile update notification
+    await prisma.notification.create({
+      data: {
+        userId,
+        title: 'Profile Updated',
+        message: 'Your personal profile details have been successfully updated.',
+        link: '/settings',
+        roleTarget: 'USER',
+        type: 'SYSTEM'
+      }
+    }).catch(err => console.error('Failed to create profile update notification:', err));
+
     res.json(user);
   } catch (error: any) {
     res.status(400).json({ message: error.message });

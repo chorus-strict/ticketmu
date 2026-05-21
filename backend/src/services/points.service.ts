@@ -76,7 +76,18 @@ export class PointsService {
             type: 'EARN',
             points,
             referenceId: order.id,
-            description: `Earned ${points} point(s) for "${order.event.title}"`
+            description: `Earned ${points} point(s) for "${order.event?.title || 'Organizer Activation'}"`
+          }
+        });
+
+        await tx.notification.create({
+          data: {
+            userId: order.userId,
+            title: 'Points Earned!',
+            message: `You earned ${points} ticket purchase points for "${order.event?.title || 'Event'}".`,
+            link: '/rewards',
+            roleTarget: 'USER',
+            type: 'SYSTEM'
           }
         });
       });
@@ -128,6 +139,17 @@ export class PointsService {
             description: `Earned ${points} point(s) for "Premium Membership Upgrade"`
           }
         });
+
+        await tx.notification.create({
+          data: {
+            userId: order.userId,
+            title: 'Points Earned!',
+            message: `You earned ${points} membership points for "Premium Membership Upgrade".`,
+            link: '/rewards',
+            roleTarget: 'USER',
+            type: 'SYSTEM'
+          }
+        });
       });
     } catch (error) {
       console.error('[PointsService] awardPointsForMembershipOrder error:', error);
@@ -135,13 +157,34 @@ export class PointsService {
   }
 
   static async adjustPoints(adminUserId: string, targetUserId: string, points: number, description: string) {
+    if (isNaN(points)) {
+      throw new Error('Points must be a valid number');
+    }
     try {
       await prisma.$transaction(async (tx) => {
+        // Fetch current points balance safely
+        const pointRecord = await tx.userPoint.findUnique({
+          where: { userId: targetUserId }
+        });
+        const currentBalance = pointRecord?.balance || 0;
+        const newBalance = currentBalance + points;
+        
+        if (newBalance < 0) {
+          throw new Error(`Deduction failed. User only has ${currentBalance} points, cannot deduct ${Math.abs(points)} points.`);
+        }
+
+        // Fetch admin info for audit history description
+        const admin = await tx.user.findUnique({
+          where: { id: adminUserId },
+          select: { name: true, email: true }
+        });
+        const adminName = admin ? `${admin.name} (${admin.email})` : 'Administrator';
+
         // Update balance
         await tx.userPoint.upsert({
           where: { userId: targetUserId },
-          update: { balance: { increment: points } },
-          create: { userId: targetUserId, balance: points }
+          update: { balance: newBalance },
+          create: { userId: targetUserId, balance: newBalance }
         });
 
         // Log adjustment
@@ -150,7 +193,20 @@ export class PointsService {
             userId: targetUserId,
             type: 'ADJUST',
             points,
-            description: `[Manual Adjustment] ${description}`
+            description: `[Manual Adjustment by ${adminName}] ${description}`
+          }
+        });
+
+        await tx.notification.create({
+          data: {
+            userId: targetUserId,
+            title: points > 0 ? 'Points Credited' : 'Points Deducted',
+            message: points > 0 
+              ? `An administrator credited your account with ${points} points: "${description}".`
+              : `An administrator deducted ${Math.abs(points)} points from your account: "${description}".`,
+            link: '/rewards',
+            roleTarget: 'USER',
+            type: 'SYSTEM'
           }
         });
       });
@@ -257,6 +313,17 @@ export class PointsService {
         }
       });
 
+      await tx.notification.create({
+        data: {
+          userId,
+          title: 'Reward Redeemed Successfully',
+          message: `Successfully redeemed "${reward.title}" for ${reward.pointsRequired} points. Your voucher is ready!`,
+          link: '/rewards',
+          roleTarget: 'USER',
+          type: 'SYSTEM'
+        }
+      });
+
       return userReward;
     });
   }
@@ -298,13 +365,17 @@ export class PointsService {
   }
 
   static async createReward(data: any) {
+    const pointsRequired = parseInt(data.pointsRequired);
+    const stock = parseInt(data.stock);
+    const parsedValue = parseFloat(data.value);
+
     return await prisma.reward.create({
       data: {
         title: data.title,
-        pointsRequired: parseInt(data.pointsRequired),
+        pointsRequired: isNaN(pointsRequired) ? 0 : pointsRequired,
         type: data.type,
-        value: parseFloat(data.value) || null,
-        stock: parseInt(data.stock),
+        value: isNaN(parsedValue) ? null : parsedValue,
+        stock: isNaN(stock) ? 0 : stock,
         isActive: true
       }
     });
@@ -313,10 +384,24 @@ export class PointsService {
   static async updateReward(id: string, data: any) {
     const updateData: any = {};
     if (data.title !== undefined) updateData.title = data.title;
-    if (data.pointsRequired !== undefined) updateData.pointsRequired = parseInt(data.pointsRequired);
+    
+    if (data.pointsRequired !== undefined) {
+      const parsed = parseInt(data.pointsRequired);
+      updateData.pointsRequired = isNaN(parsed) ? 0 : parsed;
+    }
+    
     if (data.type !== undefined) updateData.type = data.type;
-    if (data.value !== undefined) updateData.value = parseFloat(data.value) || null;
-    if (data.stock !== undefined) updateData.stock = parseInt(data.stock);
+    
+    if (data.value !== undefined) {
+      const parsed = parseFloat(data.value);
+      updateData.value = isNaN(parsed) ? null : parsed;
+    }
+    
+    if (data.stock !== undefined) {
+      const parsed = parseInt(data.stock);
+      updateData.stock = isNaN(parsed) ? 0 : parsed;
+    }
+    
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
     return await prisma.reward.update({

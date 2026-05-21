@@ -14,23 +14,32 @@ export const getDailyAnalytics = async (req: AuthRequest, res: Response) => {
     const start = getJakartaStartOfDay(new Date(startDate as string));
     const end = getJakartaEndOfDay(new Date(endDate as string));
 
-    // Fetch SUCCESS payments within range
-    const payments = await prisma.payment.findMany({
-      where: {
-        status: 'SUCCESS',
-        createdAt: {
-          gte: start,
-          lte: end,
+    let payments: { amount: number; createdAt: Date }[] = [];
+
+    if (req.user?.role === 'ORGANIZER') {
+      const orders = await prisma.order.findMany({
+        where: {
+          status: { in: ['PAID', 'APPROVED'] },
+          event: { organizerId: req.user.id },
+          createdAt: { gte: start, lte: end },
         },
-      },
-      select: {
-        amount: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
+        select: { organizerShare: true, total: true, createdAt: true },
+      });
+      payments = orders.map(o => ({ 
+        amount: o.organizerShare || (o.total * 0.90), // Fallback if share not set yet
+        createdAt: o.createdAt 
+      }));
+    } else {
+      const paymentData = await prisma.payment.findMany({
+        where: {
+          status: 'SUCCESS',
+          createdAt: { gte: start, lte: end },
+        },
+        select: { amount: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      payments = paymentData.map(p => ({ amount: p.amount, createdAt: p.createdAt }));
+    }
 
     // Group by day (Jakarta timezone)
     const dailyData: { [key: string]: number } = {};
@@ -72,21 +81,32 @@ export const getMonthlyAnalytics = async (req: AuthRequest, res: Response) => {
     const start = getJakartaStartOfDay(twelveMonthsAgo);
     start.setDate(1); // Start of the month 11 months ago
 
-    const payments = await prisma.payment.findMany({
-      where: {
-        status: 'SUCCESS',
-        createdAt: {
-          gte: start,
+    let payments: { amount: number; createdAt: Date }[] = [];
+
+    if (req.user?.role === 'ORGANIZER') {
+      const orders = await prisma.order.findMany({
+        where: {
+          status: { in: ['PAID', 'APPROVED'] },
+          event: { organizerId: req.user.id },
+          createdAt: { gte: start },
         },
-      },
-      select: {
-        amount: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
+        select: { organizerShare: true, total: true, createdAt: true },
+      });
+      payments = orders.map(o => ({ 
+        amount: o.organizerShare || (o.total * 0.90), 
+        createdAt: o.createdAt 
+      }));
+    } else {
+      const paymentData = await prisma.payment.findMany({
+        where: {
+          status: 'SUCCESS',
+          createdAt: { gte: start },
+        },
+        select: { amount: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      payments = paymentData.map(p => ({ amount: p.amount, createdAt: p.createdAt }));
+    }
 
     // Group by month (Jakarta timezone)
     const monthlyData: { [key: string]: number } = {};
@@ -136,22 +156,32 @@ export const getMonthAnalytics = async (req: AuthRequest, res: Response) => {
     const start = getJakartaStartOfDay(new Date(year, monthNum - 1, 1));
     const end = getJakartaEndOfDay(new Date(year, monthNum, 0)); // last day of month
 
-    const payments = await prisma.payment.findMany({
-      where: {
-        status: 'SUCCESS',
-        createdAt: {
-          gte: start,
-          lte: end,
+    let payments: { amount: number; createdAt: Date }[] = [];
+
+    if (req.user?.role === 'ORGANIZER') {
+      const orders = await prisma.order.findMany({
+        where: {
+          status: { in: ['PAID', 'APPROVED'] },
+          event: { organizerId: req.user.id },
+          createdAt: { gte: start, lte: end },
         },
-      },
-      select: {
-        amount: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
+        select: { organizerShare: true, total: true, createdAt: true },
+      });
+      payments = orders.map(o => ({ 
+        amount: o.organizerShare || (o.total * 0.90), 
+        createdAt: o.createdAt 
+      }));
+    } else {
+      const paymentData = await prisma.payment.findMany({
+        where: {
+          status: 'SUCCESS',
+          createdAt: { gte: start, lte: end },
+        },
+        select: { amount: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      payments = paymentData.map(p => ({ amount: p.amount, createdAt: p.createdAt }));
+    }
 
     const dailyData: { [key: string]: number } = {};
     let current = new Date(start);

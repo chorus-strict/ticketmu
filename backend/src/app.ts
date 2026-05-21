@@ -14,6 +14,8 @@ import ogRoutes from './routes/og.routes';
 import paymentMethodRoutes from './routes/payment-method.routes';
 import webhookRoutes from './routes/webhook.routes';
 import pointsRoutes from './routes/points.routes';
+import organizerRoutes from './routes/organizer.routes';
+import cartRoutes from './routes/cart.routes';
 
 const app = express();
 
@@ -44,6 +46,8 @@ app.use('/api/favorites', favoriteRoutes);
 app.use('/api/og/event', ogRoutes);
 app.use('/api/payment-methods', paymentMethodRoutes);
 app.use('/api/points', pointsRoutes);
+app.use('/api/organizer', organizerRoutes);
+app.use('/api/cart', cartRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

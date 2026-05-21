@@ -25,13 +25,13 @@ export default function TicketManagement() {
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
-  const filteredTickets = tickets.filter(t => {
+  const filteredTickets = (tickets ?? []).filter(t => {
     const matchesSearch = 
-      t.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      t.event?.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (t as any).user?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      (t.id || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (t.event?.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ((t as any).user?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = filterStatus === 'ALL' || t.status === filterStatus;
+    const matchesStatus = filterStatus === 'ALL' || t.ticketStatus === filterStatus;
     
     return matchesSearch && matchesStatus;
   });
@@ -39,7 +39,7 @@ export default function TicketManagement() {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingTicket) {
-      await updateTicket(editingTicket.id, { status: editingTicket.status });
+      await updateTicket(editingTicket.id, { ticketStatus: editingTicket.ticketStatus });
       setEditingTicket(null);
     }
   };
@@ -48,6 +48,7 @@ export default function TicketManagement() {
     switch (status) {
       case 'ACTIVE': return <CheckCircle className="w-4 h-4 text-emerald-500" />;
       case 'USED': return <XCircle className="w-4 h-4 text-slate-400" />;
+      case 'EXPIRED': return <AlertCircle className="w-4 h-4 text-rose-400" />;
       case 'CANCELLED': return <AlertCircle className="w-4 h-4 text-rose-500" />;
     }
   };
@@ -55,8 +56,9 @@ export default function TicketManagement() {
   const getStatusStyle = (status: TicketStatus) => {
     switch (status) {
       case 'ACTIVE': return 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800';
-      case 'USED': return 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700';
-      case 'CANCELLED': return 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-400 border-rose-100 dark:border-rose-800';
+      case 'USED': return 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 border-indigo-100 dark:border-indigo-800';
+      case 'EXPIRED': return 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-400 border-rose-100 dark:border-rose-800';
+      case 'CANCELLED': return 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700';
     }
   };
 
@@ -84,6 +86,7 @@ export default function TicketManagement() {
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active</option>
             <option value="USED">Used</option>
+            <option value="EXPIRED">Expired</option>
             <option value="CANCELLED">Cancelled</option>
           </select>
         </div>
@@ -106,9 +109,9 @@ export default function TicketManagement() {
                 <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl flex items-center justify-center border border-indigo-100 dark:border-indigo-800 group-hover:scale-110 transition-transform">
                   <TicketIcon className="w-7 h-7 text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <div className={`px-2.5 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${getStatusStyle(ticket.status)}`}>
-                  {getStatusIcon(ticket.status)}
-                  {ticket.status}
+                <div className={`px-2.5 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${getStatusStyle(ticket.ticketStatus)}`}>
+                  {getStatusIcon(ticket.ticketStatus)}
+                  {ticket.ticketStatus}
                 </div>
               </div>
 
@@ -125,7 +128,7 @@ export default function TicketManagement() {
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{formatDateTime(ticket.createdAt || ticket.purchaseDate)}</span>
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{formatDateTime(ticket.createdAt || ticket.purchasedAt)}</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Tag className="w-3.5 h-3.5 text-slate-400" />
@@ -192,14 +195,14 @@ export default function TicketManagement() {
               <form onSubmit={handleUpdate} className="p-8 space-y-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Current Status</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {(['ACTIVE', 'USED', 'CANCELLED'] as TicketStatus[]).map((status) => (
+                  <div className="grid grid-cols-2 gap-3">
+                    {(['ACTIVE', 'USED', 'EXPIRED', 'CANCELLED'] as TicketStatus[]).map((status) => (
                       <button
                         key={status}
                         type="button"
-                        onClick={() => setEditingTicket({ ...editingTicket, status })}
+                        onClick={() => setEditingTicket({ ...editingTicket, ticketStatus: status })}
                         className={`py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${
-                          editingTicket.status === status 
+                          editingTicket.ticketStatus === status 
                             ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-600/20 active:scale-95' 
                             : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-700 hover:border-slate-300'
                         }`}

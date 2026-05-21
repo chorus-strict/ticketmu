@@ -157,7 +157,7 @@ export default function TicketValidation() {
                           <div>
                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pass Holder</p>
                              <p className="text-sm font-bold text-slate-900 dark:text-white leading-none capitalize">
-                                {getUserData(result.ticket.userId)?.name || 'Guest User'}
+                                {result.ticket.user?.name || getUserData(result.ticket.userId)?.name || 'Guest User'}
                              </p>
                           </div>
                        </div>

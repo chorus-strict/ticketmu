@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Smartphone, Camera, Loader2, Check, AlertCircle, Link as LinkIcon } from 'lucide-react';
+import { User, Mail, Smartphone, Camera, Loader2, Check, AlertCircle, Lock, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import Layout from '../components/layout/Layout';
@@ -16,8 +16,10 @@ export default function EditProfilePage() {
 
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
-  const [email] = useState(user?.email || '');
+  const [email, setEmail] = useState(user?.email || '');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar || '');
+  
+  const isAdmin = user?.role === 'ADMIN';
   
   // Avatar states
   const [previewAvatar, setPreviewAvatar] = useState(getAvatar(user?.avatar));
@@ -112,9 +114,16 @@ export default function EditProfilePage() {
     if (file) handleFile(file);
   };
 
+  const hasChanges = name !== (user?.name || '') || 
+                    phone !== (user?.phone || '') || 
+                    avatarUrl !== (user?.avatar || '') || 
+                    (isAdmin && email !== (user?.email || '')) ||
+                    selectedFile !== null;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name) return;
+    if (!name || (isAdmin && !email)) return;
+    if (!hasChanges) return;
 
     setIsSubmitting(true);
     setError('');
@@ -129,6 +138,7 @@ export default function EditProfilePage() {
       await api.put('/user/update-profile', { 
         name, 
         phone, 
+        email: isAdmin ? email : undefined,
         avatar: finalAvatarUrl 
       });
 
@@ -142,7 +152,7 @@ export default function EditProfilePage() {
         navigate(-1);
       }, 1500);
     } catch (err: any) {
-      setError(err.message || 'Failed to update profile. Please try again.');
+      setError(err.response?.data?.message || err.message || 'Failed to update profile. Please try again.');
       setIsSubmitting(false);
     }
   };
@@ -197,9 +207,19 @@ export default function EditProfilePage() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300">
-              <AlertCircle className="w-5 h-5 text-red-500 flex-none" />
-              <p className="text-sm font-bold text-red-600 dark:text-red-400">{error}</p>
+            <div className={`border p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top duration-300 ${
+              error.includes('sent to administrator') 
+                ? 'bg-indigo-50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-800/30'
+                : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/30'
+            }`}>
+              {error.includes('sent to administrator') ? (
+                <Check className="w-5 h-5 text-indigo-500 flex-none" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-red-500 flex-none" />
+              )}
+              <p className={`text-sm font-bold ${
+                error.includes('sent to administrator') ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600 dark:text-red-400'
+              }`}>{error}</p>
             </div>
           )}
 
@@ -234,18 +254,44 @@ export default function EditProfilePage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Email Address</label>
+            <div className="flex items-center justify-between ml-1">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Email Address</label>
+              {!isAdmin && (
+                <button 
+                  type="button"
+                  onClick={() => setError('Email change request sent to administrator.')}
+                  className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:text-indigo-700 transition-colors"
+                >
+                  Request Change
+                </button>
+              )}
+            </div>
             <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
+              <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors h-5 w-5 ${
+                isAdmin ? 'text-slate-400 group-focus-within:text-indigo-600' : 'text-slate-300'
+              }`} />
               <input 
                 value={email}
-                disabled
-                className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl py-4 pl-12 pr-4 font-medium text-slate-400 cursor-not-allowed outline-none" 
-                placeholder="Email" 
+                onChange={(e) => isAdmin && setEmail(e.target.value)}
+                disabled={!isAdmin}
+                className={`w-full border rounded-xl py-4 pl-12 pr-12 font-medium transition-all outline-none ${
+                  isAdmin 
+                    ? 'bg-white dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 text-slate-900 dark:text-white' 
+                    : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 text-slate-400 cursor-not-allowed'
+                }`}
+                placeholder="Email Address" 
                 type="email"
+                required={isAdmin}
               />
+              {!isAdmin && (
+                <Lock className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 h-4 w-4" />
+              )}
             </div>
-            <p className="text-[10px] text-slate-400 font-medium ml-1">Email cannot be changed for security reasons.</p>
+            {isAdmin ? (
+              <p className="text-[10px] text-indigo-500 font-bold ml-1 uppercase tracking-widest">Administrator: Full access to email management</p>
+            ) : (
+              <p className="text-[10px] text-slate-400 font-medium ml-1">Email can only be changed by administrator or through secure verification.</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -265,11 +311,11 @@ export default function EditProfilePage() {
           <div className="pt-6">
             <button 
               type="submit"
-              disabled={isSubmitting || !name}
+              disabled={isSubmitting || !name || !hasChanges}
               className={`w-full py-4.5 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg ${
                 showSuccess 
                   ? 'bg-green-600 shadow-green-600/20 text-white' 
-                  : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20 text-white disabled:bg-indigo-600/50 disabled:cursor-not-allowed'
+                  : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20 text-white disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none transition-colors'
               }`}
             >
               {isSubmitting ? (

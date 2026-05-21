@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import toast from 'react-hot-toast';
 import { 
   UserRole, 
   MembershipLevel,
@@ -7,6 +8,8 @@ import {
 import { CheckCircle, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import api from '../services/api';
+import { EventCategory } from '../constants';
+import { safeStorage } from '../lib/safeStorage';
 
 export type UserStatus = 'ACTIVE' | 'SUSPENDED';
 export type EventStatus = 'LIVE' | 'DRAFT' | 'ENDED';
@@ -26,8 +29,24 @@ export interface ManagedUser {
   password?: string;
 }
 
+export interface TicketTier {
+  id: string;
+  eventId: string;
+  name: string;
+  description?: string | null;
+  price: number;
+  quantity: number;
+  sold: number;
+  benefits?: any;
+  colorTheme?: string | null;
+  isFeatured: boolean;
+  salesStart?: string | null;
+  salesEnd?: string | null;
+}
+
 export interface ManagedEvent {
   id: string;
+  slug?: string;
   title: string;
   date: string;
   status: EventStatus;
@@ -36,13 +55,18 @@ export interface ManagedEvent {
   capacity: number;
   sold: number;
   image: string;
-  category: string;
+  category: EventCategory;
   description: string;
   location: string;
   latitude?: number;
   longitude?: number;
   isFeatured?: boolean;
   createdAt?: string;
+  popularity?: number;
+  trendingScore?: number;
+  tags?: string[];
+  maxTicketsPerUser?: number;
+  ticketTiers?: TicketTier[];
 }
 
 export interface CartItem {
@@ -51,20 +75,34 @@ export interface CartItem {
   price: number;
   image: string;
   quantity: number;
+  ticketTierId?: string;
+  ticketTierName?: string;
 }
 
-export type TicketStatus = 'ACTIVE' | 'USED' | 'CANCELLED';
+export type TicketStatus = 'ACTIVE' | 'USED' | 'EXPIRED' | 'CANCELLED';
 export type OrderStatus = 'PENDING' | 'PAID' | 'APPROVED' | 'REJECTED' | 'FAILED';
 
 export interface Ticket {
   id: string;
   eventId: string;
   userId: string;
-  status: TicketStatus;
+  ticketStatus: TicketStatus;
   qrCode: string;
-  purchaseDate: string;
+  purchasedAt: string;
+  usedAt?: string;
+  expiredAt?: string;
+  eventStartDate?: string;
+  eventEndDate?: string;
   createdAt?: string;
+  updatedAt?: string;
   event?: ManagedEvent;
+  ticketTierId?: string;
+  ticketTier?: TicketTier;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }
 
 export interface ManagedOrder {
@@ -78,6 +116,8 @@ export interface ManagedOrder {
   user?: { name: string; email: string };
   event?: ManagedEvent;
   ticketId?: string;
+  ticketTierId?: string;
+  ticketTier?: TicketTier;
 }
 
 export interface ManagedMembershipOrder {
@@ -93,7 +133,7 @@ export interface ManagedMembershipOrder {
 export interface ManagedPayment {
   id: string;
   userId: string;
-  type: 'TICKET' | 'MEMBERSHIP';
+  type: 'TICKET' | 'MEMBERSHIP' | 'ORGANIZER_APPLICATION';
   amount: number;
   status: 'PENDING' | 'SUCCESS' | 'FAILED';
   referenceId?: string;
@@ -109,15 +149,61 @@ export interface ManagedPaymentMethod {
   config: any;
 }
 
+export interface OrganizerProfile {
+  id: string;
+  userId: string;
+  companyName: string;
+  description?: string;
+  logo?: string;
+  bankName?: string;
+  bankAccount?: string;
+  totalRevenue: number;
+  balance: number;
+}
+
+export interface OrganizerStats {
+  totalEvents: number;
+  totalTicketsSold: number;
+  totalRevenue: number;
+  balance: number;
+  pendingOrders: number;
+}
+
+export interface ManagedOrganizerRequest {
+  id: string;
+  userId: string;
+  user?: { name: string; email: string };
+  companyName: string;
+  description?: string;
+  logo?: string;
+  website?: string;
+  bankAccount?: string;
+  bankName?: string;
+  status: 'PAYMENT_PENDING' | 'WAITING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  amount: number;
+  proofUrl?: string;
+  paymentMethod?: ManagedPaymentMethod;
+  paymentMethodId?: string;
+  paidAt?: string;
+  processedAt?: string;
+  processedBy?: string;
+  createdAt: string;
+}
+
 interface ManagementContextType {
   users: ManagedUser[];
   events: ManagedEvent[];
+  myEvents: ManagedEvent[];
+  organizerProfile: OrganizerProfile | null;
+  organizerStats: OrganizerStats | null;
   trendingEvents: ManagedEvent[];
   cart: CartItem[];
   tickets: Ticket[];
   orders: ManagedOrder[];
   membershipOrders: ManagedMembershipOrder[];
   myMembershipOrder: ManagedMembershipOrder | null;
+  organizerRequests: ManagedOrganizerRequest[];
+  myOrganizerRequest: ManagedOrganizerRequest | null;
   paymentMethods: ManagedPaymentMethod[];
   userPoints: number;
   rewards: any[];
@@ -142,21 +228,29 @@ interface ManagementContextType {
   addEvent: (event: Omit<ManagedEvent, 'id'>) => Promise<void>;
   updateEvent: (id: string, updates: Partial<ManagedEvent>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
-  addToCart: (event: ManagedEvent) => void;
-  removeFromCart: (eventId: string) => void;
-  updateCartQuantity: (eventId: string, quantity: number) => void;
-  checkout: (paymentMethodId?: string, userRewardId?: string) => Promise<string | undefined>;
+  addToCart: (event: ManagedEvent, tierId?: string) => Promise<void>;
+  removeFromCart: (eventId: string, tierId?: string) => Promise<void>;
+  updateCartQuantity: (eventId: string, quantity: number, tierId?: string) => Promise<void>;
+  buyNow: (event: ManagedEvent, tierId?: string) => Promise<{ orderId: string; checkoutUrl?: string; } | undefined>;
+  checkout: (paymentMethodId?: string, userRewardId?: string) => Promise<{ orderId: string; checkoutUrl: string; } | undefined>;
   confirmPayment: (orderId: string) => Promise<void>;
   fetchPaymentHistory: (filters?: { startDate?: string; endDate?: string; status?: string }) => Promise<ManagedPayment[]>;
   fetchOrders: () => Promise<void>;
-  requestMembershipUpgrade: (paymentMethodId?: string) => Promise<void>;
+  requestMembershipUpgrade: (paymentMethodId?: string, userRewardId?: string) => Promise<{ id: string; checkoutUrl: string; } | undefined>;
   fetchMembershipOrders: () => Promise<void>;
   fetchPaymentMethods: () => Promise<ManagedPaymentMethod[]>;
   approveMembership: (id: string) => Promise<void>;
   rejectMembership: (id: string) => Promise<void>;
+  approveOrder: (id: string) => Promise<void>;
+  rejectOrder: (id: string) => Promise<void>;
   setMembershipPending: (id: string) => Promise<void>;
   confirmMembershipPayment: (id: string) => Promise<void>;
   markMembershipPaymentFailed: (id: string) => Promise<void>;
+  fetchOrganizerRequests: () => Promise<void>;
+  fetchMyOrganizerRequest: () => Promise<void>;
+  confirmOrganizerPayment: (requestId: string, proofUrl?: string) => Promise<void>;
+  approveOrganizerRequest: (id: string) => Promise<void>;
+  rejectOrganizerRequest: (id: string) => Promise<void>;
   updateUserRole: (id: string, role: UserRole) => Promise<void>;
   suspendUser: (id: string) => Promise<void>;
   updateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
@@ -187,7 +281,19 @@ interface ManagementContextType {
   addReward: (reward: any) => Promise<void>;
   updateReward: (id: string, updates: any) => Promise<void>;
   deleteReward: (id: string) => Promise<void>;
-  refreshData: () => Promise<void>;
+  upgradeToOrganizer: (data: { 
+    companyName: string; 
+    bankName: string; 
+    bankAccount: string; 
+    description?: string; 
+    logo?: string;
+    website?: string;
+    paymentMethodId?: string;
+  }) => Promise<any>;
+  fetchOrganizerProfile: () => Promise<void>;
+  fetchOrganizerStats: () => Promise<void>;
+  fetchMyEvents: () => Promise<void>;
+  refreshData: (force?: boolean) => Promise<void>;
 }
 
 const ManagementContext = createContext<ManagementContextType | undefined>(undefined);
@@ -208,7 +314,9 @@ const MOCK_EVENTS: ManagedEvent[] = [
     location: 'Ancol Carnival Beach, Jakarta',
     latitude: -6.1176,
     longitude: 106.8407,
-    isFeatured: true
+    isFeatured: true,
+    createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    trendingScore: 95
   },
   {
     id: 'mock-2',
@@ -224,7 +332,9 @@ const MOCK_EVENTS: ManagedEvent[] = [
     description: 'Connect with tech leaders and innovators from across the globe. Join us for a day of inspiring talks and networking.',
     location: 'ICE BSD City, Tangerang',
     latitude: -6.3001,
-    longitude: 106.6385
+    longitude: 106.6385,
+    createdAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+    trendingScore: 45
   }
 ];
 
@@ -232,10 +342,13 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const { user, refreshUser } = useAuth();
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [events, setEvents] = useState<ManagedEvent[]>([]);
+  const [myEvents, setMyEvents] = useState<ManagedEvent[]>([]);
+  const [organizerProfile, setOrganizerProfile] = useState<OrganizerProfile | null>(null);
+  const [organizerStats, setOrganizerStats] = useState<OrganizerStats | null>(null);
   const [trendingEvents, setTrendingEvents] = useState<ManagedEvent[]>([]);
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
-      const saved = localStorage.getItem('tiketmu_cart');
+      const saved = safeStorage.getItem('tiketmu_cart');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -245,6 +358,8 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [orders, setOrders] = useState<ManagedOrder[]>([]);
   const [membershipOrders, setMembershipOrders] = useState<ManagedMembershipOrder[]>([]);
   const [myMembershipOrder, setMyMembershipOrder] = useState<ManagedMembershipOrder | null>(null);
+  const [organizerRequests, setOrganizerRequests] = useState<ManagedOrganizerRequest[]>([]);
+  const [myOrganizerRequest, setMyOrganizerRequest] = useState<ManagedOrganizerRequest | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<ManagedPaymentMethod[]>([]);
   const [favoriteEventIds, setFavoriteEventIds] = useState<Set<string>>(new Set());
   const [backendNotifications, setBackendNotifications] = useState<any[]>([]);
@@ -264,14 +379,25 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [notification, setNotification] = useState<string | null>(null);
 
   const showNotification = (msg: string) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 3000);
+    toast.success(msg, {
+      style: {
+        borderRadius: '1rem',
+        background: '#0f172a',
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: '0.75rem',
+        textTransform: 'uppercase'
+      }
+    });
   };
 
   const fetchUsers = useCallback(async (page: number, limit: number) => {
     try {
       const res = await api.get(`/users?page=${page}&limit=${limit}`);
-      setUsers(res.data.users);
+      const data = Array.isArray(res.data.users) ? res.data.users : [];
+      // Deduplicate by ID
+      const unique = data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      setUsers(unique);
       setUserPagination({
         total: res.data.total,
         page: res.data.page,
@@ -286,7 +412,10 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const fetchTrendingEvents = useCallback(async () => {
     try {
       const res = await api.get('/events/trending');
-      setTrendingEvents(res.data);
+      const data = Array.isArray(res.data) ? res.data : [];
+      // Deduplicate by ID
+      const unique = data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      setTrendingEvents(unique);
     } catch (err) {
       console.error('Failed to fetch trending events:', err);
     }
@@ -295,7 +424,10 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const searchEvents = async (query: string) => {
     try {
       const res = await api.get(`/events/search?q=${encodeURIComponent(query)}`);
-      return res.data;
+      const data = Array.isArray(res.data) ? res.data : [];
+      // Deduplicate by ID
+      const unique = data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      return unique;
     } catch (err) {
       console.error('Search failed:', err);
       return [];
@@ -305,7 +437,11 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const fetchOrders = useCallback(async () => {
     try {
       const res = await api.get('/orders');
-      setOrders(res.data.orders || res.data);
+      const ordersData = res.data.orders || res.data;
+      const data = Array.isArray(ordersData) ? ordersData : [];
+      // Deduplicate by ID
+      const unique = data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      setOrders(unique);
     } catch (err) {
       console.error('Failed to fetch orders:', err);
     }
@@ -314,7 +450,10 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const fetchMembershipOrders = useCallback(async () => {
     try {
       const res = await api.get('/membership/orders');
-      setMembershipOrders(res.data);
+      const data = Array.isArray(res.data) ? res.data : [];
+      // Deduplicate by ID
+      const unique = data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      setMembershipOrders(unique);
     } catch (err) {
       console.error('Failed to fetch membership orders:', err);
     }
@@ -332,8 +471,11 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const fetchPaymentMethods = useCallback(async () => {
     try {
       const res = await api.get('/payment-methods');
-      setPaymentMethods(res.data);
-      return res.data;
+      const data = Array.isArray(res.data) ? res.data : [];
+      // Deduplicate by ID
+      const unique = data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      setPaymentMethods(unique);
+      return unique;
     } catch (err) {
       console.error('Failed to fetch payment methods:', err);
       return [];
@@ -454,7 +596,9 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (queryString) url += `?${queryString}`;
 
       const res = await api.get(url);
-      return res.data;
+      const data = Array.isArray(res.data) ? res.data : [];
+      // Deduplicate by ID
+      return data.filter((v: any, i: number, a: any[]) => a.findIndex(t => t.id === v.id) === i);
     } catch (err) {
       console.error('Failed to fetch payment history:', err);
       return [];
@@ -504,12 +648,17 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       isFetchingNotifications.current = true;
       const res = await api.get('/notifications');
       if (Array.isArray(res.data)) {
-        setBackendNotifications(res.data);
+        // Deduplicate by ID
+        const unique = res.data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+        setBackendNotifications(unique);
       } else {
         console.warn('Backend notifications response is not an array:', res.data);
         setBackendNotifications([]);
       }
     } catch (err: any) {
+      if (err.response?.status === 401) {
+        return;
+      }
       if (err.status === 429 || err.response?.status === 429) {
         console.warn('Notification fetching rate limited (429)');
       } else {
@@ -577,7 +726,10 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!user) return;
     try {
       const res = await api.get('/points/logs');
-      setPointLogs(res.data);
+      const data = Array.isArray(res.data) ? res.data : [];
+      // Deduplicate by ID
+      const unique = data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      setPointLogs(unique);
     } catch (err) {
       console.error('Failed to fetch point logs:', err);
     }
@@ -587,7 +739,10 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!user) return;
     try {
       const res = await api.get('/points/my-rewards');
-      setMyRewards(res.data);
+      const data = Array.isArray(res.data) ? res.data : [];
+      // Deduplicate by ID
+      const unique = data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      setMyRewards(unique);
     } catch (err) {
       console.error('Failed to fetch my rewards:', err);
     }
@@ -596,7 +751,10 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const fetchRewards = useCallback(async () => {
     try {
       const res = await api.get('/points/rewards');
-      setRewards(res.data);
+      const data = Array.isArray(res.data) ? res.data : [];
+      // Deduplicate by ID
+      const unique = data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      setRewards(unique);
     } catch (err) {
       console.error('Failed to fetch rewards:', err);
     }
@@ -627,7 +785,15 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setIsLoading(true);
       await api.post('/points/adjust', { userId, points, description });
       showNotification(`Successfully ${points > 0 ? 'awarded' : 'deducted'} points`);
-      await fetchUsers(userPagination.page);
+      await fetchUsers(userPagination.page, userPagination.limit);
+      
+      // Real-time synchronization
+      if (user && userId === user.id) {
+        await refreshUser();
+        await fetchUserPoints();
+        await fetchPointLogs();
+        await fetchMyRewards();
+      }
     } catch (error: any) {
       console.error('Adjustment failed:', error);
       showNotification(error.response?.data?.message || 'Adjustment failed');
@@ -706,10 +872,122 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  const refreshData = useCallback(async () => {
+  const upgradeToOrganizer = async (data: { companyName: string; bankName: string; bankAccount: string; description?: string; logo?: string; website?: string; paymentMethodId?: string }) => {
+    try {
+      setIsLoading(true);
+      const res = await api.post('/organizer/upgrade', data);
+      await refreshData();
+      await refreshUser();
+      showNotification('Organizer application submitted!');
+      return res.data;
+    } catch (error: any) {
+      console.error('Upgrade to organizer failed:', error);
+      const msg = error.response?.data?.message || 
+                 (error.response?.data?.errors ? error.response.data.errors.map((e: any) => e.message).join(', ') : 'Upgrade failed');
+      showNotification(msg);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchOrganizerRequests = useCallback(async () => {
+    try {
+      const res = await api.get('/organizer/requests');
+      setOrganizerRequests(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error('Failed to fetch organizer requests:', err);
+    }
+  }, []);
+
+  const fetchMyOrganizerRequest = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await api.get('/organizer/my-request');
+      setMyOrganizerRequest(res.data);
+    } catch (err) {
+      console.error('Failed to fetch my organizer request:', err);
+    }
+  }, [user]);
+
+  const confirmOrganizerPayment = async (requestId: string, proofUrl?: string) => {
+    try {
+      setIsLoading(true);
+      await api.post('/organizer/confirm-payment', { requestId, proofUrl });
+      await refreshData();
+      await refreshUser();
+      showNotification('Payment confirmed! Waiting for admin approval.');
+    } catch (error: any) {
+      console.error('Failed to confirm organizer payment:', error);
+      showNotification(error.response?.data?.message || 'Confirmation failed');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const approveOrganizerRequest = async (id: string) => {
+    try {
+      setIsLoading(true);
+      await api.post(`/organizer/approve/${id}`);
+      await refreshData();
+      showNotification('Organizer application approved!');
+    } catch (error: any) {
+      console.error('Approval failed:', error);
+      showNotification(error.response?.data?.message || 'Approval failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const rejectOrganizerRequest = async (id: string) => {
+    try {
+      setIsLoading(true);
+      await api.post(`/organizer/reject/${id}`);
+      await refreshData();
+      showNotification('Organizer application rejected');
+    } catch (error: any) {
+      console.error('Rejection failed:', error);
+      showNotification(error.response?.data?.message || 'Rejection failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchOrganizerProfile = useCallback(async () => {
+    if (!user || user.role !== 'ORGANIZER') return;
+    try {
+      const res = await api.get('/organizer/profile');
+      setOrganizerProfile(res.data);
+    } catch (err) {
+      console.error('Failed to fetch organizer profile:', err);
+    }
+  }, [user]);
+
+  const fetchOrganizerStats = useCallback(async () => {
+    if (!user || user.role !== 'ORGANIZER') return;
+    try {
+      const res = await api.get('/organizer/stats');
+      setOrganizerStats(res.data);
+    } catch (err) {
+      console.error('Failed to fetch organizer stats:', err);
+    }
+  }, [user]);
+
+  const fetchMyEvents = useCallback(async () => {
+    if (!user || user.role !== 'ORGANIZER') return;
+    try {
+      const res = await api.get('/organizer/my-events');
+      setMyEvents(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error('Failed to fetch my events:', err);
+    }
+  }, [user]);
+
+  const refreshData = useCallback(async (force = false) => {
     // Throttling: only refresh once every 5 seconds unless explicitly forced
     const now = Date.now();
-    if (now - lastFetchRef.current < 5000) {
+    if (!force && now - lastFetchRef.current < 5000) {
       return;
     }
     lastFetchRef.current = now;
@@ -725,12 +1003,20 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const [eventsRes] = await Promise.all([
         api.get('/events').catch(err => {
           console.error('Failed to fetch events:', err);
-          return { data: MOCK_EVENTS };
+          return { data: [] };
         }),
         fetchTrendingEvents()
       ]);
       
-      setEvents(eventsRes.data);
+      const eventsData = Array.isArray(eventsRes.data) ? eventsRes.data : [];
+      // Deduplicate by ID
+      const uniqueEvents = eventsData.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+      
+      if (uniqueEvents.length === 0 && events.length === 0) {
+        setEvents(MOCK_EVENTS);
+      } else if (uniqueEvents.length > 0) {
+        setEvents(uniqueEvents);
+      }
 
       if (user) {
         // Only fetch if not already in progress
@@ -738,25 +1024,41 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           fetchBackendNotifications();
         }
         fetchMyMembershipOrder();
+        fetchMyOrganizerRequest();
         fetchUserFavorites();
         fetchPaymentMethods();
         fetchUserPoints();
+        
+        if (user.role === 'ORGANIZER') {
+          fetchOrganizerProfile();
+          fetchOrganizerStats();
+          fetchMyEvents();
+        }
       }
 
       if (user && user.role === 'ADMIN') {
         try {
           const ticketsRes = await api.get('/tickets?all=true');
-          setTickets(ticketsRes.data.tickets || ticketsRes.data);
+          const ticketsData = ticketsRes.data.tickets || ticketsRes.data;
+          const data = Array.isArray(ticketsData) ? ticketsData : [];
+          // Deduplicate by ID
+          const uniqueTickets = data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+          setTickets(uniqueTickets);
           await fetchUsers(1, 10);
           await fetchOrders();
           await fetchMembershipOrders();
+          await fetchOrganizerRequests();
         } catch (err) {
           console.error('Failed to fetch admin data:', err);
         }
       } else if (user) {
         try {
           const ticketsRes = await api.get('/tickets');
-          setTickets(ticketsRes.data.tickets || ticketsRes.data);
+          const ticketsData = ticketsRes.data.tickets || ticketsRes.data;
+          const data = Array.isArray(ticketsData) ? ticketsData : [];
+          // Deduplicate by ID
+          const uniqueTickets = data.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+          setTickets(uniqueTickets);
           await fetchOrders();
         } catch (err) {
           console.error('Failed to fetch user tickets:', err);
@@ -776,18 +1078,91 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [refreshData]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      // Clear all user-specific states immediately on logout to prevent cross-user leakage
+      setBackendNotifications([]);
+      setTickets([]);
+      setOrders([]);
+      setMembershipOrders([]);
+      setMyMembershipOrder(null);
+      setOrganizerRequests([]);
+      setMyOrganizerRequest(null);
+      setMyRewards([]);
+      setPointLogs([]);
+      setUserPoints(0);
+      setCart([]);
+      return;
+    }
     
     const interval = setInterval(() => {
       fetchBackendNotifications();
-    }, 30000); // Poll every 30 seconds
+    }, 10000); // Speed up dynamic synchrony: poll every 10 seconds
     
     return () => clearInterval(interval);
   }, [user, fetchBackendNotifications]);
 
   useEffect(() => {
-    localStorage.setItem('tiketmu_cart', JSON.stringify(cart));
-  }, [cart]);
+    // Only persist guest cart to safeStorage when not logged in to avoid collisions.
+    if (!user) {
+      safeStorage.setItem('tiketmu_cart', JSON.stringify(cart));
+    }
+  }, [cart, user]);
+
+  const fetchDbCart = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await api.get('/cart');
+      if (Array.isArray(res.data)) {
+        const mappedCart: CartItem[] = res.data.map((item: any) => ({
+          eventId: item.eventId,
+          title: item.event?.title || '',
+          price: item.priceSnapshot,
+          image: item.event?.image || '',
+          quantity: item.quantity,
+          ticketTierId: item.ticketTierId || undefined,
+          ticketTierName: item.ticketTier?.name || undefined,
+          dbId: item.id // Keep database entry reference ID
+        }));
+        setCart(mappedCart);
+      }
+    } catch (err) {
+      console.error('Failed to fetch DB cart:', err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      const syncLocalCartToDb = async () => {
+        try {
+          const saved = safeStorage.getItem('tiketmu_cart');
+          const localCart: CartItem[] = saved ? JSON.parse(saved) : [];
+          if (localCart.length > 0) {
+            for (const item of localCart) {
+              await api.post('/cart', {
+                eventId: item.eventId,
+                ticketTierId: item.ticketTierId,
+                quantity: item.quantity
+              });
+            }
+            safeStorage.removeItem('tiketmu_cart');
+          }
+          await fetchDbCart();
+        } catch (err) {
+          console.error('Error syncing local cart to DB:', err);
+          await fetchDbCart();
+        }
+      };
+      
+      syncLocalCartToDb();
+    } else {
+      try {
+        const saved = safeStorage.getItem('tiketmu_cart');
+        setCart(saved ? JSON.parse(saved) : []);
+      } catch {
+        setCart([]);
+      }
+    }
+  }, [user, fetchDbCart]);
 
   const addUser = async (userData: any) => {
     try {
@@ -830,75 +1205,222 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const updateEvent = async (id: string, updates: Partial<ManagedEvent>) => {
+    // Optimistic state updates for instant interactive feedback
+    const applyOptimistic = (prev: ManagedEvent[]) =>
+      prev.map(item => (item.id === id ? { ...item, ...updates } : item));
+
+    setEvents(applyOptimistic);
+    setMyEvents(applyOptimistic);
+
     try {
       await api.put(`/events/${id}`, updates);
       await refreshData();
     } catch (error) {
       console.error('Error updating event:', error);
+      await refreshData(true); // Restore original state in case of failure
       throw error;
     }
   };
 
   const deleteEvent = async (id: string) => {
     try {
+      // Optimistic update for immediate response of the UI (no ghost cards!)
+      setEvents(prev => prev.filter(e => e.id !== id));
+      setMyEvents(prev => prev.filter(e => e.id !== id));
+
       await api.delete(`/events/${id}`);
-      await refreshData();
+      await refreshData(true); // Force sync background data
     } catch (error) {
       console.error('Error deleting event:', error);
+      await refreshData(true); // Recover state if backend delete failed
       throw error;
     }
   };
 
-  const addToCart = (event: ManagedEvent) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.eventId === event.id);
-      if (existing) {
-        return prev.map(item => item.eventId === event.id ? { ...item, quantity: item.quantity + 1 } : item);
+  const addToCart = async (event: ManagedEvent, tierId?: string) => {
+    const tier = event.ticketTiers?.find(t => t.id === tierId);
+    const tierName = tier ? tier.name : '';
+    const itemTitle = `${event.title}${tierName ? ` (${tierName})` : ''}`;
+
+    if (user) {
+      try {
+        setIsLoading(true);
+        await api.post('/cart', {
+          eventId: event.id,
+          ticketTierId: tierId,
+          quantity: 1
+        });
+        await fetchDbCart();
+        showNotification(`Added ${itemTitle} to cart`);
+      } catch (error: any) {
+        console.error('Error adding to DB cart:', error);
+        toast.error(error.response?.data?.message || 'Failed to add item to list');
+      } finally {
+        setIsLoading(false);
       }
-      return [...prev, { 
-        eventId: event.id, 
-        title: event.title, 
-        price: event.price, 
-        image: event.image,
-        quantity: 1 
-      }];
-    });
-    showNotification(`Added ${event.title} to cart`);
+    } else {
+      const limit = event.maxTicketsPerUser ?? 5;
+      const totalEventQty = cart
+        .filter(item => item.eventId === event.id)
+        .reduce((sum, item) => sum + item.quantity, 0);
+
+      if (totalEventQty + 1 > limit) {
+        toast.error(`Anda telah mencapai batas maksimum pembelian ticket untuk event ini. (Max ${limit})`);
+        return;
+      }
+
+      setCart(prev => {
+        const existing = prev.find(item => item.eventId === event.id && item.ticketTierId === tierId);
+        if (existing) {
+          return prev.map(item => (item.eventId === event.id && item.ticketTierId === tierId) ? { ...item, quantity: item.quantity + 1 } : item);
+        }
+        return [...prev, { 
+          eventId: event.id, 
+          title: event.title, 
+          price: tier ? tier.price : event.price, 
+          image: event.image,
+          quantity: 1,
+          ticketTierId: tierId,
+          ticketTierName: tier ? tier.name : undefined
+        }];
+      });
+      showNotification(`Added ${itemTitle} to cart (local guest)`);
+    }
   };
 
-  const removeFromCart = (eventId: string) => {
-    setCart(prev => prev.filter(item => item.eventId !== eventId));
+  const removeFromCart = async (eventId: string, tierId?: string) => {
+    if (user) {
+      const itemToDel = cart.find(item => item.eventId === eventId && item.ticketTierId === tierId);
+      const dbId = (itemToDel as any)?.dbId;
+      if (dbId) {
+        try {
+          setIsLoading(true);
+          await api.delete(`/cart/${dbId}`);
+          await fetchDbCart();
+          showNotification('Item removed from cart');
+        } catch (error: any) {
+          console.error('Error removing from DB cart:', error);
+          showNotification('Failed to remove item');
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        await fetchDbCart();
+      }
+    } else {
+      setCart(prev => prev.filter(item => !(item.eventId === eventId && item.ticketTierId === tierId)));
+      showNotification('Item removed from cart');
+    }
   };
 
-  const updateCartQuantity = (eventId: string, quantity: number) => {
+  const updateCartQuantity = async (eventId: string, quantity: number, tierId?: string) => {
     if (quantity <= 0) {
-      removeFromCart(eventId);
+      await removeFromCart(eventId, tierId);
       return;
     }
-    setCart(prev => prev.map(item => item.eventId === eventId ? { ...item, quantity } : item));
+
+    if (user) {
+      const itemToUpdate = cart.find(item => item.eventId === eventId && item.ticketTierId === tierId);
+      const dbId = (itemToUpdate as any)?.dbId;
+      if (dbId) {
+        try {
+          setIsLoading(true);
+          await api.put(`/cart/${dbId}`, { quantity });
+          await fetchDbCart();
+        } catch (error: any) {
+          console.error('Error updating cart quantity in DB:', error);
+          toast.error(error.response?.data?.message || 'Failed to update quantity');
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        await fetchDbCart();
+      }
+    } else {
+      const currentItem = cart.find(item => item.eventId === eventId && item.ticketTierId === tierId);
+      if (currentItem) {
+        // Calculate total of other items for the same event
+        const otherItemsQty = cart
+          .filter(item => item.eventId === eventId && item.ticketTierId !== tierId)
+          .reduce((sum, item) => sum + item.quantity, 0);
+
+        // Find event from events list to get its maxTicketsPerUser
+        const eventItem = events.find(e => e.id === eventId);
+        const limit = eventItem?.maxTicketsPerUser ?? 5;
+
+        if (otherItemsQty + quantity > limit) {
+          toast.error(`Anda telah mencapai batas maksimum pembelian ticket untuk event ini. (Max ${limit})`);
+          return;
+        }
+      }
+      setCart(prev => prev.map(item => (item.eventId === eventId && item.ticketTierId === tierId) ? { ...item, quantity } : item));
+    }
+  };
+
+  const buyNow = async (event: ManagedEvent, tierId?: string): Promise<{ orderId: string, checkoutUrl?: string } | undefined> => {
+    if (!user) {
+      showNotification('Please log in to finalize your purchase');
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      const defaultPaymentMethod = paymentMethods.find(p => p.status) || paymentMethods[0];
+      const paymentMethodId = defaultPaymentMethod?.id;
+
+      const res = await api.post('/tickets/purchase', {
+        eventId: event.id,
+        ticketTierId: tierId,
+        paymentMethodId: paymentMethodId || undefined
+      });
+      
+      await refreshData();
+      showNotification('Instant reservation created! Redirecting to payment...');
+      return { 
+        orderId: res.data.id, 
+        checkoutUrl: res.data.checkoutUrl 
+      };
+    } catch (error: any) {
+      console.error('Buy Now error:', error);
+      toast.error(error.response?.data?.message || 'Failed to initialize instant purchase');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const checkout = async (paymentMethodId?: string, userRewardId?: string) => {
     try {
       setIsLoading(true);
-      let lastOrderId = '';
-      let checkoutUrl = '';
-      // Backend doesn't have bulk purchase yet, loop for now or add to backend
-      for (const item of cart) {
-        for (let i = 0; i < item.quantity; i++) {
-          const res = await api.post('/tickets/purchase', { 
-            eventId: item.eventId,
-            paymentMethodId,
-            userRewardId
-          });
-          lastOrderId = res.data.id;
-          if (res.data.checkoutUrl) checkoutUrl = res.data.checkoutUrl;
+      if (user) {
+        const res = await api.post('/cart/checkout', {
+          paymentMethodId,
+          userRewardId
+        });
+        setCart([]);
+        await refreshData();
+        showNotification('Order created! Please proceed to payment.');
+        return { orderId: res.data.orderId, checkoutUrl: res.data.checkoutUrl };
+      } else {
+        let lastOrderId = '';
+        let checkoutUrl = '';
+        for (const item of cart) {
+          for (let i = 0; i < item.quantity; i++) {
+            const res = await api.post('/tickets/purchase', { 
+              eventId: item.eventId,
+              ticketTierId: item.ticketTierId,
+              paymentMethodId,
+              userRewardId
+            });
+            lastOrderId = res.data.id;
+            if (res.data.checkoutUrl) checkoutUrl = res.data.checkoutUrl;
+          }
         }
+        setCart([]);
+        await refreshData();
+        showNotification('Order created! Please proceed to payment.');
+        return { orderId: lastOrderId, checkoutUrl };
       }
-      setCart([]);
-      await refreshData();
-      showNotification('Order created! Please proceed to payment.');
-      return { orderId: lastOrderId, checkoutUrl };
     } catch (error: any) {
       console.error('Checkout error:', error);
       showNotification(error.response?.data?.message || 'Checkout failed');
@@ -953,9 +1475,11 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const fetchUserFavorites = useCallback(async () => {
     try {
       const res = await api.get('/favorites');
-      const events = res.data;
-      setFavoriteEventIds(new Set(events.map((e: any) => e.id)));
-      return events;
+      const data = Array.isArray(res.data) ? res.data : [];
+      // Deduplicate by ID
+      const unique = data.filter((v: any, i, a: any[]) => a.findIndex(t => t.id === v.id) === i);
+      setFavoriteEventIds(new Set(unique.map((e: any) => e.id)));
+      return unique;
     } catch (err) {
       console.error('Fetch favorites failed:', err);
       return [];
@@ -994,8 +1518,12 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const res = await api.get(`/tickets?limit=${limit}&offset=${offset}${filters?.status ? `&status=${filters.status}` : ''}`);
       
       const data = res.data;
+      const rawTickets = data.tickets || [];
+      // Deduplicate by ID
+      const uniqueTickets = rawTickets.filter((v: any, i: number, a: any[]) => a.findIndex(t => t.id === v.id) === i);
+      
       return { 
-        tickets: data.tickets || [], 
+        tickets: uniqueTickets, 
         total: data.total || 0,
         page: data.page || page,
         totalPages: data.totalPages || 0
@@ -1016,6 +1544,8 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       orders,
       membershipOrders,
       myMembershipOrder,
+      organizerRequests,
+      myOrganizerRequest,
       paymentMethods,
       isLoading,
       userPagination,
@@ -1029,6 +1559,7 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       addToCart,
       removeFromCart,
       updateCartQuantity,
+      buyNow,
       checkout,
       confirmPayment: confirmUserPayment,
       fetchPaymentHistory,
@@ -1041,6 +1572,11 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setMembershipPending,
       confirmMembershipPayment,
       markMembershipPaymentFailed,
+      fetchOrganizerRequests,
+      fetchMyOrganizerRequest,
+      confirmOrganizerPayment,
+      approveOrganizerRequest,
+      rejectOrganizerRequest,
       updateUserRole,
       suspendUser,
       fetchBackendNotifications,
@@ -1067,6 +1603,13 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       myRewards,
       pointLogs,
       rewardsConfig,
+      myEvents,
+      organizerProfile,
+      organizerStats,
+      upgradeToOrganizer,
+      fetchOrganizerProfile,
+      fetchOrganizerStats,
+      fetchMyEvents,
       fetchUserPoints,
       fetchRewards,
       fetchMyRewards,
@@ -1081,23 +1624,6 @@ export const ManagementProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       refreshData
     }}>
       {children}
-      
-      {/* Global Notification Toast */}
-      <AnimatePresence>
-        {notification && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50, x: '-50%' }}
-            animate={{ opacity: 1, y: -20, x: '-50%' }}
-            exit={{ opacity: 0, y: 50, x: '-50%' }}
-            className="fixed bottom-24 left-1/2 z-[100] bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 font-bold text-sm whitespace-nowrap border border-white/10"
-          >
-            <div className="w-6 h-6 bg-indigo-600 rounded-lg flex items-center justify-center">
-              <CheckCircle className="w-4 h-4 text-white" />
-            </div>
-            {notification}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </ManagementContext.Provider>
   );
 };

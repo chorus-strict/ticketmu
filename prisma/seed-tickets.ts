@@ -30,8 +30,8 @@ async function main() {
       userId: user.id,
       eventId: randomEvent.id,
       qrCode: `TCK-${uuidv4().slice(0, 8).toUpperCase()}`,
-      status: 'ACTIVE' as const,
-      purchaseDate: new Date(Date.now() - Math.floor(Math.random() * 1000000000)), // Random date in the past
+      ticketStatus: 'ACTIVE' as const,
+      purchasedAt: new Date(Date.now() - Math.floor(Math.random() * 1000000000)), // Random date in the past
     });
   }
 
@@ -44,8 +44,8 @@ async function main() {
       userId: randomUser.id,
       eventId: randomEvent.id,
       qrCode: `TCK-${uuidv4().slice(0, 8).toUpperCase()}`,
-      status: 'ACTIVE' as const,
-      purchaseDate: new Date(Date.now() - Math.floor(Math.random() * 1000000000)),
+      ticketStatus: 'ACTIVE' as const,
+      purchasedAt: new Date(Date.now() - Math.floor(Math.random() * 1000000000)),
     });
   }
 

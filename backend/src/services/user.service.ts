@@ -1,5 +1,17 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
+import { z } from 'zod';
+
+export const userUpdateSchema = z.object({
+  email: z.string().email().optional(),
+  name: z.string().min(2).optional(),
+  password: z.string().min(6).optional(),
+  role: z.enum(['USER', 'ORGANIZER', 'ADMIN']).optional(),
+  membership: z.enum(['FREE', 'PENDING', 'PREMIUM']).optional(),
+  status: z.enum(['ACTIVE', 'SUSPENDED']).optional(),
+  avatar: z.string().url().optional().or(z.string().length(0)),
+  phone: z.string().optional(),
+});
 
 class UserService {
   async getAll(page: number = 1, limit: number = 10) {
@@ -63,7 +75,9 @@ class UserService {
   }
 
   async update(id: string, data: any) {
-    const updateData = { ...data };
+    // Validate request data
+    const validatedData = userUpdateSchema.parse(data);
+    const updateData: any = { ...validatedData };
 
     // Handle password hashing if provided
     if (updateData.password && updateData.password.trim() !== '') {
@@ -85,9 +99,25 @@ class UserService {
       }
     }
 
-    return await prisma.user.update({
-      where: { id },
-      data: updateData,
+    return await prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id },
+        data: updateData,
+        include: { organizerProfile: true }
+      });
+
+      // Automatically create OrganizerProfile if role is set to ORGANIZER and no profile exists
+      if (user.role === 'ORGANIZER' && !user.organizerProfile) {
+        await tx.organizerProfile.create({
+          data: {
+            userId: user.id,
+            companyName: user.name || 'My Organization',
+            isVerified: true
+          }
+        });
+      }
+
+      return user;
     });
   }
 

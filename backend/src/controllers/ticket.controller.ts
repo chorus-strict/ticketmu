@@ -6,8 +6,8 @@ import { orderService } from '../services/order.service';
 
 export const purchaseTicket = async (req: AuthRequest, res: Response) => {
   try {
-    const { eventId, paymentMethodId, userRewardId } = req.body;
-    const order = await orderService.create(req.user!.id, eventId, paymentMethodId, userRewardId);
+    const { eventId, ticketTierId, paymentMethodId, userRewardId } = req.body;
+    const order = await orderService.create(req.user!.id, eventId, ticketTierId, paymentMethodId, userRewardId);
     res.status(201).json(order);
   } catch (error: any) {
     res.status(400).json({ message: error.message || 'Order creation failed' });
@@ -21,11 +21,15 @@ export const getTickets = async (req: AuthRequest, res: Response) => {
     const status = req.query.status as string | undefined;
 
     let result;
+    const isOrganizer = req.user!.role === 'ORGANIZER';
+    const isAdmin = req.user!.role === 'ADMIN';
 
-    if (req.user!.role === 'ADMIN' && req.query.all === 'true') {
+    if (isAdmin && req.query.all === 'true') {
       // If all=true, we fetch everything for admin analytics, but with a reasonable upper bound
       const maxLimit = 10000; 
       result = await ticketService.getAll(maxLimit, 0, status);
+    } else if (isOrganizer) {
+      result = await ticketService.getByOrganizer(req.user!.id, limit, offset, status);
     } else {
       result = await ticketService.getByUser(req.user!.id, limit, offset, status);
     }
@@ -66,7 +70,7 @@ export const deleteTicket = async (req: AuthRequest, res: Response) => {
 export const validateTicket = async (req: AuthRequest, res: Response) => {
   try {
     const { qrCode } = req.body;
-    const result = await ticketService.validate(qrCode);
+    const result = await ticketService.validate(qrCode, req.user!.id, req.user!.role);
     res.json({ message: 'Ticket validated successfully', ticket: result });
   } catch (error: any) {
     res.status(400).json({ message: error.message });

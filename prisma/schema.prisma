@@ -30,17 +30,64 @@ enum NotificationType {
   ORDER
   PAYMENT
   SYSTEM
+  ORGANIZER_REQUEST
+}
+
+enum OrderType {
+  TICKET
+  ORGANIZER_ACTIVATION
 }
 
 enum Role {
   USER
+  ORGANIZER
   ADMIN
+}
+
+model OrganizerRequest {
+  id              String                 @id @default(uuid())
+  userId          String
+  user            User                   @relation(fields: [userId], references: [id])
+  companyName     String
+  description     String?
+  logo            String?
+  website         String?
+  bankAccount     String?
+  bankName        String?
+  status          OrganizerRequestStatus @default(PAYMENT_PENDING)
+  amount          Float                  @default(300000)
+  proofUrl        String?
+  gatewayRef      String?
+  paymentMethodId String?
+  paymentMethod   PaymentMethod?         @relation(fields: [paymentMethodId], references: [id])
+  paidAt          DateTime?
+  processedAt     DateTime?
+  processedBy     String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  order           Order?
+
+  @@index([userId])
+}
+
+enum OrganizerRequestStatus {
+  PAYMENT_PENDING
+  WAITING_APPROVAL
+  APPROVED
+  REJECTED
 }
 
 enum Membership {
   FREE
   PENDING
   PREMIUM
+}
+
+enum RevenueStatus {
+  PENDING
+  SETTLED
+  REFUNDED
 }
 
 model MembershipOrder {
@@ -90,8 +137,9 @@ model PaymentMethod {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  orders           Order[]
-  membershipOrders MembershipOrder[]
+  orders            Order[]
+  membershipOrders  MembershipOrder[]
+  organizerRequests OrganizerRequest[]
 }
 
 enum EventStatus {
@@ -108,6 +156,7 @@ enum EventVisibility {
 enum TicketStatus {
   ACTIVE
   USED
+  EXPIRED
   CANCELLED
 }
 
@@ -139,7 +188,7 @@ model User {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
-  events  Event[] // Events created by this user
+  events  Event[] @relation("OrganizerEvents") // Events created by this user
   favorites Favorite[]
   tickets Ticket[]
   orders            Order[]
@@ -149,6 +198,28 @@ model User {
   points            UserPoint?
   pointLogs         PointLog[]
   userRewards       UserReward[]
+  organizerRequests OrganizerRequest[]
+
+  organizerProfile OrganizerProfile?
+  scannedTickets   TicketScan[]      @relation("ScannedBy")
+  cartItems        CartItem[]
+}
+
+model OrganizerProfile {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName  String
+  bio          String?
+  logo         String?
+  website      String?
+  isVerified   Boolean  @default(false)
+  bankAccount  String?
+  bankName     String?
+  totalRevenue Float    @default(0)
+  balance      Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model UserReward {
@@ -229,6 +300,7 @@ model Payment {
 enum PaymentType {
   TICKET
   MEMBERSHIP
+  ORGANIZER_APPLICATION
 }
 
 enum PaymentStatus {
@@ -239,6 +311,7 @@ enum PaymentStatus {
 
 model Event {
   id          String          @id @default(uuid())
+  slug        String          @unique
   title       String
   description String
   date        DateTime
@@ -252,15 +325,42 @@ model Event {
   status      EventStatus     @default(DRAFT)
   visibility  EventVisibility @default(PUBLIC)
   isFeatured  Boolean         @default(false)
+  isArchived  Boolean         @default(false)
+  maxTicketsPerUser Int       @default(5)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  authorId String
-  author   User   @relation(fields: [authorId], references: [id])
+  organizerId String @map("authorId")
+  organizer   User   @relation("OrganizerEvents", fields: [organizerId], references: [id])
 
   tickets Ticket[]
   orders  Order[]
   favorites Favorite[]
+  ticketTiers TicketTier[]
+  cartItems CartItem[]
+}
+
+model TicketTier {
+  id            String   @id @default(uuid())
+  eventId       String
+  name          String
+  description   String?
+  price         Float
+  quantity      Int
+  sold          Int      @default(0)
+  benefits      Json?
+  colorTheme    String?
+  isFeatured    Boolean  @default(false)
+  salesStart    DateTime?
+  salesEnd      DateTime?
+  createdAt     DateTime @default(now())
+
+  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tickets       Ticket[]
+  orders        Order[]
+  cartItems     CartItem[]
+
+  @@index([eventId])
 }
 
 model Favorite {
@@ -277,29 +377,54 @@ model Favorite {
 }
 
 model Ticket {
-  id           String       @id @default(uuid())
-  qrCode       String       @unique
-  status       TicketStatus @default(ACTIVE)
-  purchaseDate DateTime     @default(now())
-  createdAt    DateTime     @default(now())
+  id              String       @id @default(uuid())
+  qrCode          String       @unique
+  ticketStatus    TicketStatus @default(ACTIVE)
+  
+  purchasedAt     DateTime     @default(now())
+  usedAt          DateTime?
+  expiredAt       DateTime?
+  
+  eventStartDate  DateTime?
+  eventEndDate    DateTime?
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @default(now()) @updatedAt
 
-  userId  String
-  user    User   @relation(fields: [userId], references: [id])
-  eventId String
-  event   Event  @relation(fields: [eventId], references: [id])
+  userId          String
+  user            User         @relation(fields: [userId], references: [id])
+  eventId         String
+  event           Event        @relation(fields: [eventId], references: [id])
+  ticketTierId    String?
+  ticketTier      TicketTier?  @relation(fields: [ticketTierId], references: [id])
 
-  order   Order?
+  order           Order?
+  scans           TicketScan[]
 
   @@index([userId])
   @@index([eventId])
+  @@index([ticketTierId])
+}
+
+model TicketScan {
+  id        String   @id @default(uuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String // The organizer/staff who scanned the ticket
+  user      User     @relation("ScannedBy", fields: [userId], references: [id])
+  scannedAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([userId])
 }
 
 model Order {
   id              String         @id @default(uuid())
+  type            OrderType      @default(TICKET)
   userId          String
   user            User           @relation(fields: [userId], references: [id])
-  eventId         String
-  event           Event          @relation(fields: [eventId], references: [id])
+  eventId         String?
+  event           Event?         @relation(fields: [eventId], references: [id])
   total           Float
   discountAmount  Float          @default(0)
   userRewardId    String?
@@ -311,12 +436,42 @@ model Order {
   paymentMethodId String?
   paymentMethod   PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
   paymentLogs     PaymentLog[]
+  ticketTierId    String?
+  ticketTier      TicketTier?    @relation(fields: [ticketTierId], references: [id])
+  
+  organizerRequestId String?   @unique
+  organizerRequest   OrganizerRequest? @relation(fields: [organizerRequestId], references: [id])
+  
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
-  ticketId String? @unique
-  ticket   Ticket? @relation(fields: [ticketId], references: [id])
+  ticketId        String?        @unique
+  ticket          Ticket?        @relation(fields: [ticketId], references: [id])
+
+  platformFee     Float          @default(0)
+  organizerShare  Float          @default(0)
+  revenueStatus   RevenueStatus  @default(PENDING)
 
   @@index([userId])
   @@index([eventId])
+  @@index([ticketTierId])
+}
+
+model CartItem {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId       String
+  event         Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ticketTierId  String?
+  ticketTier    TicketTier? @relation(fields: [ticketTierId], references: [id], onDelete: Cascade)
+  quantity      Int         @default(1)
+  priceSnapshot Float
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([userId, eventId, ticketTierId])
+  @@index([userId])
+  @@index([eventId])
+  @@index([ticketTierId])
 }

@@ -47,73 +47,79 @@ export default function RewardsPage() {
     }
   };
 
-  const myVouchers = myRewards.filter(r => !r.isUsed);
-  const usedHistory = myRewards.filter(r => r.isUsed);
+  const myVouchers = (myRewards || []).filter(r => !r.isUsed);
+  const usedHistory = (myRewards || []).filter(r => r.isUsed);
 
   return (
     <Layout>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-10">
+      <main className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-16 py-12 lg:py-24">
         
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-12 mb-20">
+          <div className="flex items-center gap-8">
             <button 
               onClick={() => navigate(-1)}
-              className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:translate-x-1 transition-transform"
+              className="w-16 h-16 bg-white dark:bg-slate-900 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 shadow-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all active:scale-90 group"
             >
-              <ChevronLeft className="w-5 h-5 text-slate-400" />
+              <ChevronLeft className="w-8 h-8 text-slate-300 group-hover:text-white transition-colors" />
             </button>
-            <div>
-              <h1 className="text-3xl font-display font-extrabold text-slate-900 dark:text-white uppercase italic tracking-tighter">Rewards Hub</h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Redeem points for vouchers & discounts</p>
+            <div className="relative">
+              <div className="absolute -top-10 -left-6 w-24 h-24 bg-indigo-600/10 blur-3xl rounded-full"></div>
+              <h1 className="text-5xl lg:text-6xl font-display font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">Rewards Hub</h1>
+              <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.4em] mt-6 italic opacity-60">Architecting value through engagement</p>
             </div>
           </div>
 
-          <div className="bg-slate-900 text-white p-6 rounded-[2.5rem] border border-white/5 flex items-center gap-6 relative overflow-hidden group shadow-2xl">
-             <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-600/20 blur-3xl rounded-full"></div>
-             <div className="w-14 h-14 bg-indigo-600 rounded-[1.5rem] flex items-center justify-center shadow-lg transform group-hover:rotate-12 transition-transform">
-                <Star className="w-8 h-8 text-white fill-white" />
+          <div className="bg-slate-900 dark:bg-slate-950 text-white p-10 lg:p-12 rounded-[3.5rem] border border-white/5 flex items-center gap-10 relative overflow-hidden group shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)]">
+             <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-600/10 blur-[100px] rounded-full"></div>
+             <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center shadow-2xl transform group-hover:rotate-12 transition-all duration-700">
+                <Star className="w-10 h-10 text-white fill-white" />
              </div>
-             <div>
-                <div className="flex items-baseline gap-2">
-                   <span className="text-3xl font-display font-black leading-none">{userPoints}</span>
-                   <span className="text-[8px] font-black uppercase tracking-[0.3em] text-indigo-400">Total Balance</span>
+             <div className="relative z-10">
+                <div className="flex items-baseline gap-3 mb-2">
+                   <span className="text-5xl font-display font-black leading-none tracking-tighter">{userPoints}</span>
+                   <span className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400 italic">Total Balance</span>
                 </div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-2 flex items-center gap-2">
-                   <Clock className="w-3 h-3" /> Earning: 1 Point/Ticket
-                </p>
+                <div className="flex items-center gap-3 text-slate-500">
+                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                   <p className="text-[10px] font-black uppercase tracking-[0.2em] italic">Earning Protocol: 1 Point / Acquisition</p>
+                </div>
              </div>
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-10">
+        <div className="grid lg:grid-cols-12 gap-12 lg:gap-20">
           
           {/* Rewards Grid (8 cols) */}
-          <div className="lg:col-span-8 flex flex-col gap-10">
+          <div className="lg:col-span-12 xl:col-span-8 flex flex-col gap-16">
              
              {/* My Active Vouchers */}
              {myVouchers.length > 0 && (
                <div>
-                  <div className="flex items-center gap-3 mb-6">
-                    <TicketIcon className="w-5 h-5 text-indigo-600" />
-                    <h2 className="text-xl font-display font-extrabold uppercase italic tracking-tight">My Active Vouchers</h2>
+                  <div className="flex items-center gap-4 mb-10">
+                    <div className="w-1 h-8 bg-indigo-600 rounded-full"></div>
+                    <TicketIcon className="w-6 h-6 text-indigo-600" />
+                    <h2 className="text-2xl font-display font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Active Transmissions</h2>
                   </div>
-                  <div className="grid sm:grid-cols-2 gap-6">
+                  <div className="grid sm:grid-cols-2 gap-10">
                     {myVouchers.map((v) => (
-                      <div key={v.id} className="relative bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[2.5rem] p-8 text-white overflow-hidden group shadow-xl">
-                        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-150 transition-transform">
-                           <TicketIcon className="w-20 h-20" />
+                      <div key={v.id} className="relative bg-gradient-to-br from-indigo-700 via-indigo-600 to-indigo-900 rounded-[3.5rem] p-12 text-white overflow-hidden group shadow-[0_50px_100px_-20px_rgba(79,70,229,0.4)] hover:scale-[1.02] transition-all duration-700">
+                        <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:scale-150 transition-transform duration-1000">
+                           <TicketIcon className="w-32 h-32" />
                         </div>
                         <div className="relative z-10">
-                           <div className="text-[10px] font-black uppercase tracking-[0.3em] opacity-80 mb-2">Claimable Discount</div>
-                           <h3 className="text-2xl font-display font-black uppercase italic mb-4 leading-tight">{v.reward.title}</h3>
-                           <div className="flex items-center gap-2 mb-6">
-                              <span className="text-4xl font-display font-black leading-none tracking-tighter">Rp {v.value.toLocaleString()}</span>
-                              <span className="text-[10px] font-bold uppercase opacity-60">Off</span>
+                           <div className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40 mb-3 leading-none">Security Node Voucher</div>
+                           <h3 className="text-3xl font-display font-black uppercase italic mb-6 leading-tight tracking-tighter">{v.reward.title}</h3>
+                           <div className="flex items-baseline gap-4 mb-10">
+                              <span className="text-5xl font-display font-black leading-none tracking-tighter shadow-sm">Rp {v.value.toLocaleString()}</span>
+                              <span className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 italic">Reduction</span>
                            </div>
-                           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex items-center justify-between">
-                              <span className="text-[10px] font-black uppercase tracking-widest">Show At Checkout</span>
-                              <CheckCircle className="w-4 h-4" />
+                           <div className="bg-white/10 backdrop-blur-2xl rounded-2xl p-6 border border-white/10 flex items-center justify-between group-hover:bg-white/20 transition-all">
+                              <div>
+                                <span className="text-[10px] font-black uppercase tracking-[0.3em] block mb-1">Clearing Code</span>
+                                <span className="text-xs font-mono font-black tracking-[0.2em] opacity-60">AUTOMATIC AT CHECKOUT</span>
+                              </div>
+                              <CheckCircle className="w-6 h-6 text-indigo-300" />
                            </div>
                         </div>
                       </div>
@@ -123,64 +129,65 @@ export default function RewardsPage() {
              )}
 
              <div>
-                <div className="flex items-center gap-3 mb-6">
-                   <Gift className="w-5 h-5 text-indigo-600" />
-                   <h2 className="text-xl font-display font-extrabold uppercase italic tracking-tight">Redeem New Perks</h2>
+                <div className="flex items-center gap-4 mb-10">
+                   <div className="w-1 h-8 bg-indigo-600 rounded-full"></div>
+                   <Gift className="w-6 h-6 text-indigo-600" />
+                   <h2 className="text-2xl font-display font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Available Strategic Perks</h2>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-6">
+                <div className="grid sm:grid-cols-2 gap-10">
                    {rewards.length > 0 ? (
                      rewards.map((reward) => {
                        const canRedeem = userPoints >= reward.pointsRequired && reward.stock > 0;
                        return (
                          <div 
                            key={reward.id} 
-                           className={`bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col transition-all relative group h-full ${
-                             !canRedeem ? 'opacity-80' : 'hover:border-indigo-400 dark:hover:border-indigo-800'
+                           className={`bg-white dark:bg-slate-900 rounded-[3.5rem] p-10 lg:p-12 border border-slate-100 dark:border-slate-800 shadow-xl flex flex-col transition-all duration-500 relative group h-full ${
+                             !canRedeem ? 'opacity-80 grayscale-[0.5]' : 'hover:shadow-[0_50px_100px_-20px_rgba(0,0,0,0.1)] hover:-translate-y-2'
                            }`}
                          >
-                            <div className="absolute top-6 right-6">
-                               <div className={`p-3 rounded-2xl ${reward.stock > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'} text-[10px] font-black uppercase tracking-widest px-4`}>
-                                 {reward.stock > 0 ? `${reward.stock} Left` : 'Out of Stock'}
+                            <div className="absolute top-10 right-10">
+                               <div className={`py-2 px-6 rounded-xl text-[9px] font-black uppercase tracking-[0.3em] border ${reward.stock > 0 ? 'bg-emerald-500/5 text-emerald-500 border-emerald-500/20' : 'bg-rose-500/5 text-rose-500 border-rose-500/20 shadow-2xl'}`}>
+                                 {reward.stock > 0 ? `${reward.stock} AVAILABLE` : 'DEPLETED'}
                                </div>
                             </div>
 
-                            <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                               {reward.type === 'DISCOUNT' ? <TicketIcon className="w-7 h-7 text-indigo-600" /> : <ShoppingBag className="w-7 h-7 text-indigo-600" />}
+                            <div className="w-20 h-20 bg-slate-50 dark:bg-slate-950 rounded-[2rem] flex items-center justify-center mb-10 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner border border-slate-100 dark:border-slate-800">
+                               {reward.type === 'DISCOUNT' ? <TicketIcon className="w-9 h-9 transition-colors" /> : <ShoppingBag className="w-9 h-9 transition-colors" />}
                             </div>
 
                             <div className="flex-1">
-                               <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1 rounded-full mb-3 inline-block">
-                                  {reward.type}
+                               <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] bg-indigo-600/5 px-5 py-2 rounded-xl mb-6 inline-block border border-indigo-600/10 italic">
+                                  {reward.type} PROT
                                </span>
-                               <h3 className="text-xl font-display font-extrabold text-slate-900 dark:text-white uppercase italic leading-tight mb-2">
+                               <h3 className="text-2xl font-display font-black text-slate-900 dark:text-white uppercase italic leading-tight mb-4 tracking-tighter">
                                   {reward.title}
                                </h3>
-                               <div className="flex items-center gap-2 text-slate-400 mb-6">
-                                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                                  <span className="text-xs font-bold">{reward.pointsRequired} Points Required</span>
-                               </div>
+                               <div className="flex items-center gap-3 text-slate-400 mb-10">
+                                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                                  <span className="text-[11px] font-black uppercase tracking-[0.2em] italic opacity-60">{reward.pointsRequired} Intel Points Required</span>
+                                </div>
                             </div>
 
                             <button 
                                onClick={() => handleRedeem(reward)}
                                disabled={!canRedeem || isLoading}
-                               className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+                               className={`w-full py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-all duration-500 shadow-2xl ${
                                  canRedeem 
-                                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 active:scale-95 hover:bg-slate-900' 
-                                 : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                                 ? 'bg-slate-950 dark:bg-indigo-600 text-white shadow-indigo-600/30 hover:bg-indigo-600 dark:hover:bg-white dark:hover:text-slate-900 active:scale-95 group-hover:translate-x-1' 
+                                 : 'bg-slate-50 dark:bg-slate-800/50 text-slate-400 cursor-not-allowed border border-slate-100 dark:border-slate-800'
                                }`}
                             >
-                               {isLoading ? 'Redeeming...' : canRedeem ? 'Redeem Item' : (reward.stock <= 0 ? 'Out of Stock' : 'Not Enough Points')}
-                               {canRedeem && !isLoading && <ArrowRight className="w-3.5 h-3.5" />}
+                               {isLoading ? 'Clearing...' : canRedeem ? 'Authorize Redeem' : (reward.stock <= 0 ? 'Out of Supply' : 'Insufficient Intel')}
+                               {canRedeem && !isLoading && <ArrowRight className="w-4 h-4" />}
                             </button>
                          </div>
                        );
                      })
                    ) : (
-                     <div className="col-span-full py-20 bg-slate-50 dark:bg-slate-900/40 rounded-[3rem] border border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-center">
-                        <Lock className="w-12 h-12 text-slate-300 mb-4" />
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] italic">No rewards active at the moment</p>
+                     <div className="col-span-full py-32 bg-slate-50 dark:bg-slate-950 rounded-[4rem] border border-slate-100 dark:border-slate-800 flex flex-col items-center justify-center text-center shadow-inner">
+                        <Lock className="w-16 h-16 text-slate-200 dark:text-slate-800 mb-8" />
+                        <p className="text-[11px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.4em] italic opacity-60">Locked Protocol: No active rewards detected</p>
                      </div>
                    )}
                 </div>
@@ -188,80 +195,88 @@ export default function RewardsPage() {
           </div>
 
           {/* Activity Log (4 cols) */}
-          <div className="lg:col-span-4 flex flex-col gap-10 self-start sticky top-28">
-             <div className="bg-white dark:bg-slate-900 rounded-[3rem] p-10 border border-slate-100 dark:border-slate-800 shadow-sm">
-                <div className="flex items-center gap-3 mb-8">
-                   <History className="w-5 h-5 text-indigo-600" />
-                   <h2 className="text-lg font-display font-bold uppercase italic tracking-tight">Point & Voucher History</h2>
+          <div className="lg:col-span-12 xl:col-span-4 flex flex-col gap-12 self-start xl:sticky xl:top-32">
+             <div className="bg-white dark:bg-slate-900 rounded-[3.5rem] p-12 lg:p-14 border border-slate-100 dark:border-slate-800 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.1)]">
+                <div className="flex items-center gap-4 mb-12">
+                   <div className="w-1 h-6 bg-indigo-600 rounded-full"></div>
+                   <History className="w-6 h-6 text-indigo-600" />
+                   <h2 className="text-xl font-display font-black text-slate-900 dark:text-white uppercase italic tracking-tight">Strategy Ledger</h2>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-10">
                    {pointLogs.length > 0 || usedHistory.length > 0 ? (
-                     <div className="space-y-6">
+                     <div className="space-y-10">
                         {pointLogs.map((log) => (
-                          <div key={log.id} className="flex gap-4 group">
-                             <div className={`flex-none w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm ${
-                                log.type === 'EARN' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                          <div key={log.id} className="flex gap-6 group">
+                             <div className={`flex-none w-12 h-12 rounded-[1.2rem] flex items-center justify-center shadow-inner border ${
+                                log.type === 'EARN' ? 'bg-emerald-500/5 text-emerald-500 border-emerald-500/10' : 'bg-rose-500/5 text-rose-500 border-rose-500/10'
                              }`}>
-                                {log.type === 'EARN' ? <TrendingUp className="w-4 h-4" /> : <ShoppingBag className="w-4 h-4" />}
+                                {log.type === 'EARN' ? <TrendingUp className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
                              </div>
                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between gap-2">
-                                   <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-tight truncate">{log.description}</p>
-                                   <span className={`text-[10px] font-black ${log.type === 'EARN' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                <div className="flex items-center justify-between gap-4 mb-1">
+                                   <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight truncate italic group-hover:text-indigo-600 transition-colors">{log.description}</p>
+                                   <span className={`text-sm font-display font-black italic tracking-tighter ${log.type === 'EARN' ? 'text-emerald-500' : 'text-rose-600'}`}>
                                       {log.type === 'EARN' ? '+' : '-'}{log.points}
                                    </span>
                                 </div>
-                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{formatDate(log.createdAt)}</p>
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] opacity-40">{formatDate(log.createdAt)} • NODE {log.id.slice(-4).toUpperCase()}</p>
                              </div>
                           </div>
                         ))}
                         {usedHistory.map((v) => (
-                          <div key={v.id} className="flex gap-4 group opacity-60 italic">
-                             <div className="flex-none w-10 h-10 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center shadow-sm">
-                                <CheckCircle className="w-4 h-4" />
+                          <div key={v.id} className="flex gap-6 group opacity-40 italic">
+                             <div className="flex-none w-12 h-12 bg-slate-50 dark:bg-slate-950 text-slate-300 rounded-[1.2rem] flex items-center justify-center shadow-inner border border-slate-100 dark:border-slate-800">
+                                <CheckCircle className="w-5 h-5" />
                              </div>
                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between gap-2">
-                                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-tight truncate">Used: {v.reward.title}</p>
-                                   <span className="text-[10px] font-black text-slate-400">Voucher</span>
+                                <div className="flex items-center justify-between gap-4 mb-1">
+                                   <p className="text-[11px] font-black text-slate-400 uppercase tracking-tight truncate">CLEARED: {v.reward.title}</p>
+                                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest opacity-60">NOMINAL</span>
                                 </div>
-                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Redeemed on {formatDate(v.createdAt)}</p>
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] opacity-40">Executed on {formatDate(v.createdAt)}</p>
                              </div>
                           </div>
                         ))}
                      </div>
                    ) : (
-                     <div className="py-10 text-center">
-                        <Clock className="w-8 h-8 text-slate-200 mx-auto mb-4" />
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic">No activity yet</p>
+                     <div className="py-20 text-center">
+                        <Clock className="w-12 h-12 text-slate-100 dark:text-slate-950 mx-auto mb-6 shadow-inner rounded-full p-2" />
+                        <p className="text-[10px] font-black text-slate-300 dark:text-slate-700 uppercase tracking-[0.4em] italic leading-none">No active records detected</p>
                      </div>
                    )}
                 </div>
              </div>
 
-             <div className="bg-amber-50 dark:bg-amber-900/10 p-10 rounded-[3rem] border border-amber-100 dark:border-amber-900/30">
-                <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-6 shadow-sm">
-                   <Star className="w-6 h-6 text-amber-500 fill-amber-500" />
+             <div className="bg-amber-600/5 dark:bg-amber-900/10 p-12 lg:p-14 rounded-[3.5rem] border border-amber-600/10 dark:border-amber-900/40 relative overflow-hidden group">
+                <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-amber-600/5 blur-[40px] rounded-full group-hover:scale-150 transition-transform duration-1000"></div>
+                <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-[1.5rem] flex items-center justify-center mb-10 shadow-xl border border-amber-500/20 group-hover:rotate-12 transition-all">
+                   <Star className="w-8 h-8 text-amber-500 fill-amber-500" />
                 </div>
-                <h3 className="text-lg font-display font-extrabold text-amber-900 dark:text-amber-100 uppercase italic leading-tight mb-3">Redemption Rules</h3>
-                <ul className="space-y-4">
-                   <li className="flex gap-3">
-                      <CheckCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                      <p className="text-[10px] font-bold text-amber-800/70 dark:text-amber-200/70 uppercase tracking-widest leading-relaxed">
-                        Points are non-transferable and can't be cashed out directly.
+                <h3 className="text-2xl font-display font-black text-amber-900 dark:text-amber-100 uppercase italic leading-none mb-10 tracking-tighter">Engagement Directives</h3>
+                <ul className="space-y-10">
+                   <li className="flex gap-5 group/item">
+                      <div className="w-10 h-10 rounded-full border-2 border-amber-500/20 flex items-center justify-center flex-shrink-0 group-hover/item:border-amber-500 transition-colors">
+                        <CheckCircle className="w-5 h-5 text-amber-500" />
+                      </div>
+                      <p className="text-[11px] font-black text-amber-800/60 dark:text-amber-200/50 uppercase tracking-[0.2em] leading-relaxed italic">
+                        Points are bound to account index. Zero direct liquidation protocol in effect.
                       </p>
                    </li>
-                   <li className="flex gap-3">
-                      <CheckCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                      <p className="text-[10px] font-bold text-amber-800/70 dark:text-amber-200/70 uppercase tracking-widest leading-relaxed">
-                        Successful redemptions will issue a digital code/voucher.
+                   <li className="flex gap-5 group/item">
+                      <div className="w-10 h-10 rounded-full border-2 border-amber-500/20 flex items-center justify-center flex-shrink-0 group-hover/item:border-amber-500 transition-colors">
+                        <CheckCircle className="w-5 h-5 text-amber-500" />
+                      </div>
+                      <p className="text-[11px] font-black text-amber-800/60 dark:text-amber-200/50 uppercase tracking-[0.2em] leading-relaxed italic">
+                        Authentication required for all redemption cycles. Voucher issuance is final.
                       </p>
                    </li>
-                   <li className="flex gap-3">
-                      <Clock className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                      <p className="text-[10px] font-bold text-amber-800/70 dark:text-amber-200/70 uppercase tracking-widest leading-relaxed">
-                        Points expire after 90 days of inactivity.
+                   <li className="flex gap-5 group/item">
+                      <div className="w-10 h-10 rounded-full border-2 border-amber-500/20 flex items-center justify-center flex-shrink-0 group-hover/item:border-amber-500 transition-colors">
+                        <Clock className="w-5 h-5 text-amber-500" />
+                      </div>
+                      <p className="text-[11px] font-black text-amber-800/60 dark:text-amber-200/50 uppercase tracking-[0.2em] leading-relaxed italic">
+                        Node inactivity for 90 cycles results in total point decay. Maintain engagement level.
                       </p>
                    </li>
                 </ul>

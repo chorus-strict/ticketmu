@@ -6,11 +6,31 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import app from './backend/src/app';
 import { backfillPayments } from './backend/src/lib/backfill';
+import { setupTicketCron } from './backend/src/cron/ticket-cron';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
+// Handle __dirname for both ESM and CJS (when bundled)
+let currentDir = '';
+try {
+  // @ts-ignore
+  const filename = fileURLToPath(import.meta.url);
+  currentDir = path.dirname(filename);
+} catch (e) {
+  // @ts-ignore
+  currentDir = __dirname;
+}
+
+// Validate required environment variables
+const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.warn('\x1b[33m%s\x1b[0m', 'âšï¸  Warning: Missing environment variables:');
+  missingEnvVars.forEach(varName => console.warn(`   - ${varName}`));
+  console.warn('\x1b[33m%s\x1b[0m', '   Check your .env file or refer to .env.example\n');
+}
 
 async function getMetaTags(url: string, req: express.Request) {
   const eventMatch = url.match(/\/event\/([a-zA-Z0-9-]+)/);
@@ -53,8 +73,22 @@ async function getMetaTags(url: string, req: express.Request) {
 async function startServer() {
   const PORT = 3000;
 
-  // Run backfill
-  await backfillPayments();
+  // API Health Check
+  app.get('/api/health', (req, res) => {
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      env: process.env.NODE_ENV || 'development'
+    });
+  });
+
+  // Run initial services
+  try {
+    await backfillPayments();
+    setupTicketCron();
+  } catch (err) {
+    console.error('Failed to start background services:', err);
+  }
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -70,13 +104,13 @@ async function startServer() {
       if (url.startsWith('/api') || url.includes('.')) return next();
 
       try {
-        let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
+        let template = fs.readFileSync(path.resolve(currentDir, 'index.html'), 'utf-8');
         template = await vite.transformIndexHtml(url, template);
         const metaTags = await getMetaTags(url, req);
         // Replace the default title and inject new meta tags
         const html = template
           .replace(/<title>.*?<\/title>/, '')
-          .replace('</head>', `${metaTags}</head>`);
+          .replace('</head>', `${metaTags}\n</head>`);
         
         res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
       } catch (e: any) {
@@ -107,8 +141,14 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log('\n\x1b[32m%s\x1b[0m', '>>> Tiketmu Application Started Successfully');
+    console.log('\x1b[36m%s\x1b[0m', `    Local:   http://localhost:${PORT}`);
+    console.log('\x1b[36m%s\x1b[0m', `    Network: http://0.0.0.0:${PORT}`);
+    console.log('\x1b[90m%s\x1b[0m', `    Environment: ${process.env.NODE_ENV || 'development'}\n`);
   });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});

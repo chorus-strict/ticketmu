@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
+import { safeStorage } from '../lib/safeStorage';
 
-export type UserRole = 'ADMIN' | 'USER';
+export type UserRole = 'ADMIN' | 'USER' | 'ORGANIZER';
 export type MembershipLevel = 'FREE' | 'PENDING' | 'PREMIUM';
 
 interface User {
@@ -22,6 +23,8 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<any>;
+  resetPassword: (token: string, newPassword: string) => Promise<any>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
   refreshUser: () => Promise<void>;
@@ -30,29 +33,66 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const storedUser = safeStorage.getItem('auth_user');
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (error) {
+      console.error('Error parsing stored user:', error);
+      return null;
+    }
+  });
+
+  const [token, setToken] = useState<string | null>(() => {
+    try {
+      return safeStorage.getItem('auth_token');
+    } catch {
+      return null;
+    }
+  });
+
+  const [isLoading, setIsLoading] = useState(() => {
+    try {
+      return !!safeStorage.getItem('auth_token');
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
-    // Force non-blocking render after 2 seconds no matter what
-    const safetyTimeout = setTimeout(() => setIsLoading(false), 2000);
+    // Force loaded status after 1.5 seconds safety guard
+    const safetyTimeout = setTimeout(() => setIsLoading(false), 1500);
 
     const initAuth = async () => {
       try {
-        // Check for stored session
-        const storedUser = localStorage.getItem('auth_user');
-        const storedToken = localStorage.getItem('auth_token');
+        const storedUser = safeStorage.getItem('auth_user');
+        const storedToken = safeStorage.getItem('auth_token');
 
         if (storedUser && storedToken) {
           setUser(JSON.parse(storedUser));
           setToken(storedToken);
+          
+          // Verify user session state with backend in background
+          try {
+            const response = await api.get('/user/me');
+            const latestUser = response.data;
+            setUser(latestUser);
+            safeStorage.setItem('auth_user', JSON.stringify(latestUser));
+          } catch (apiError) {
+            console.warn('Background auth status check failed:', apiError);
+            // Non-critical, keep local session if it wasn't a 401 (interceptor handles 401)
+          }
+        } else {
+          // If no stored credentials, clean state
+          setUser(null);
+          setToken(null);
         }
       } catch (error) {
         console.error('Error during auth initialization:', error);
-        // Clear corrupt data
-        localStorage.removeItem('auth_user');
-        localStorage.removeItem('auth_token');
+        safeStorage.removeItem('auth_user');
+        safeStorage.removeItem('auth_token');
+        setUser(null);
+        setToken(null);
       } finally {
         setIsLoading(false);
         clearTimeout(safetyTimeout);
@@ -70,8 +110,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setUser(sessionUser);
       setToken(sessionToken);
-      localStorage.setItem('auth_user', JSON.stringify(sessionUser));
-      localStorage.setItem('auth_token', sessionToken);
+      safeStorage.setItem('auth_user', JSON.stringify(sessionUser));
+      safeStorage.setItem('auth_token', sessionToken);
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -88,8 +128,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setUser(sessionUser);
       setToken(sessionToken);
-      localStorage.setItem('auth_user', JSON.stringify(sessionUser));
-      localStorage.setItem('auth_token', sessionToken);
+      safeStorage.setItem('auth_user', JSON.stringify(sessionUser));
+      safeStorage.setItem('auth_token', sessionToken);
     } catch (error) {
       console.error('Register error:', error);
       throw error;
@@ -98,18 +138,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const forgotPassword = async (email: string) => {
+    try {
+      const response = await api.post('/auth/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      throw error;
+    }
+  };
+
+  const resetPassword = async (token: string, newPassword: string) => {
+    try {
+      const response = await api.post('/auth/reset-password', { token, password: newPassword });
+      return response.data;
+    } catch (error) {
+      console.error('Reset password error:', error);
+      throw error;
+    }
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem('auth_user');
-    localStorage.removeItem('auth_token');
+    safeStorage.removeItem('auth_user');
+    safeStorage.removeItem('auth_token');
   };
 
   const updateUser = (updates: Partial<User>) => {
     if (user) {
       const updatedUser = { ...user, ...updates };
       setUser(updatedUser);
-      localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+      safeStorage.setItem('auth_user', JSON.stringify(updatedUser));
     }
   };
 
@@ -118,14 +178,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await api.get('/user/me');
       const latestUser = response.data;
       setUser(latestUser);
-      localStorage.setItem('auth_user', JSON.stringify(latestUser));
+      safeStorage.setItem('auth_user', JSON.stringify(latestUser));
     } catch (error) {
       console.error('Failed to refresh user data:', error);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout, updateUser, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, register, forgotPassword, resetPassword, logout, updateUser, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

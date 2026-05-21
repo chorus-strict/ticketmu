@@ -86,6 +86,23 @@ async function main() {
 
     const title = `${titles[i % titles.length]} #${i}`;
     
+    const slugify = (text: string) => {
+      return text
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, '')
+        .trim()
+        .replace(/[-\s]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    };
+
+    const baseSlug = slugify(title);
+    let slug = baseSlug;
+    let suffix = 2;
+    while (eventData.some(e => (e as any).slug === slug)) {
+      slug = `${baseSlug}-${suffix}`;
+      suffix++;
+    }
+    
     const descriptions = [
       "Join us for an unforgettable experience that brings together enthusiasts from all across Indonesia and beyond. This event is designed to challenge your perspective and provide new insights into the industry's latest trends.",
       "Experience the magic of collaboration and creativity at our upcoming gathering. We have curated a lineup of world-class speakers and performers who are ready to share their expertise and passion with our dedicated audience.",
@@ -99,6 +116,7 @@ async function main() {
 
     eventData.push({
       title,
+      slug,
       description,
       date,
       location: loc.name,
@@ -111,7 +129,7 @@ async function main() {
       status,
       visibility,
       isFeatured: i <= 5, // First 5 are featured
-      authorId: admin.id,
+      organizerId: admin.id,
     });
   }
 

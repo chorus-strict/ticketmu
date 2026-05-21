@@ -55,10 +55,10 @@ export default function MembershipManagement() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredOrders = membershipOrders.filter(order => {
+  const filteredOrders = (membershipOrders ?? []).filter(order => {
     const matchesSearch = 
-      order.user?.name.toLowerCase().includes(search.toLowerCase()) || 
-      order.user?.email.toLowerCase().includes(search.toLowerCase());
+      (order.user?.name || '').toLowerCase().includes(search.toLowerCase()) || 
+      (order.user?.email || '').toLowerCase().includes(search.toLowerCase());
     const matchesFilter = filter === 'ALL' || order.status === filter;
     return matchesSearch && matchesFilter;
   });

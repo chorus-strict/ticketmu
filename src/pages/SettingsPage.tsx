@@ -23,12 +23,20 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import Layout from '../components/layout/Layout';
+import { SUPPORT_WHATSAPP_NUMBER, SUPPORT_MESSAGE } from '../constants';
+
+import { useSearchParams } from 'react-router-dom';
+import OrganizerUpgrade from '../components/profile/OrganizerUpgrade';
+import { AnimatePresence, motion } from 'motion/react';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { logout, user } = useAuth();
   const { theme, toggleTheme, language, setLanguage, t } = useSettings();
   
+  const showUpgrade = searchParams.get('tab') === 'ORGANIZER' && user?.role !== 'ADMIN' && user?.role !== 'ORGANIZER';
+
   const [showLangModal, setShowLangModal] = useState(false);
   const [notifications, setNotifications] = useState({
     push: true,
@@ -55,11 +63,19 @@ export default function SettingsPage() {
         { label: 'System Logs', icon: <ShieldCheck className="w-5 h-5 text-rose-500" />, onClick: () => {} },
       ]
     }] : []),
+    ...(user?.role === 'ORGANIZER' ? [{
+      id: 'ORGANIZER',
+      title: 'Merchant Center',
+      items: [
+        { label: 'Partner Dashboard', icon: <LayoutDashboard className="w-5 h-5 text-indigo-500" />, onClick: () => navigate('/dashboard') },
+        { label: 'My Events', icon: <Info className="w-5 h-5 text-indigo-500" />, onClick: () => navigate('/dashboard?tab=EVENTS') },
+      ]
+    }] : []),
     {
       id: 'SECURITY',
       title: t('settings.security'),
       items: [
-        { label: 'Tiketmu Membership', icon: <Zap className="w-5 h-5 text-amber-500" />, value: user?.membership === 'MEMBER' ? 'Member' : 'Free Plan', onClick: () => navigate('/membership') },
+        { label: 'Tiketmu Membership', icon: <Zap className="w-5 h-5 text-amber-500" />, value: user?.membership === 'PREMIUM' ? 'Elite Member' : 'Standard Plan', onClick: () => navigate('/membership') },
         { label: '2FA Authentication', icon: <ShieldCheck className="w-5 h-5" />, component: (
           <div className="w-10 h-5 bg-slate-200 dark:bg-slate-700 rounded-full relative cursor-pointer">
             <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full transition-all"></div>
@@ -139,7 +155,14 @@ export default function SettingsPage() {
       title: t('settings.support'),
       items: [
         { label: 'Help Center', icon: <HelpCircle className="w-5 h-5" />, onClick: () => {} },
-        { label: 'Contact Support', icon: <MessageCircle className="w-5 h-5" />, onClick: () => {} },
+        { 
+          label: 'Contact Support', 
+          icon: <MessageCircle className="w-5 h-5" />, 
+          onClick: () => {
+            const url = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(SUPPORT_MESSAGE)}`;
+            window.open(url, '_blank', 'noopener,noreferrer');
+          } 
+        },
       ]
     },
   ];
@@ -204,6 +227,26 @@ export default function SettingsPage() {
           </div>
         </div>
       </main>
+
+      {showUpgrade && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-5">
+           <motion.div 
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             exit={{ opacity: 0 }}
+             className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" 
+             onClick={() => setSearchParams({})}
+           />
+           <motion.div 
+             initial={{ scale: 0.95, opacity: 0, y: 30 }}
+             animate={{ scale: 1, opacity: 1, y: 0 }}
+             exit={{ scale: 0.95, opacity: 0, y: 30 }}
+             className="relative w-full max-w-5xl"
+           >
+             <OrganizerUpgrade onClose={() => setSearchParams({})} />
+           </motion.div>
+        </div>
+      )}
 
       {/* Language Modal */}
       {showLangModal && (

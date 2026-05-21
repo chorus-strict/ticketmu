@@ -29,11 +29,11 @@ export default function PaymentManagement() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const filteredOrders = orders.filter(order => {
+  const filteredOrders = (orders ?? []).filter(order => {
     const matchesSearch = 
-      order.user?.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      order.user?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.event?.title.toLowerCase().includes(searchTerm.toLowerCase());
+      (order.user?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (order.user?.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.event?.title || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesFilter = filter === 'ALL' || order.status === filter;
     

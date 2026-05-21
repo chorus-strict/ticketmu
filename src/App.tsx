@@ -4,6 +4,7 @@
  */
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { ManagementProvider } from './contexts/ManagementContext';
@@ -12,6 +13,8 @@ import RoleProtectedRoute from './components/RoleProtectedRoute';
 
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import HomePage from './pages/HomePage';
 import EventDetailsPage from './pages/EventDetailsPage';
 import CartPage from './pages/CartPage';
@@ -29,16 +32,22 @@ import MembershipPaymentPage from './pages/MembershipPaymentPage';
 import FavoritesPage from './pages/FavoritesPage';
 import RewardsPage from './pages/RewardsPage';
 
+import GlobalErrorBoundary from './components/GlobalErrorBoundary';
+
 export default function App() {
   return (
-    <SettingsProvider>
-      <AuthProvider>
-        <ManagementProvider>
-          <Router>
+    <GlobalErrorBoundary name="RootApp">
+      <SettingsProvider>
+        <Toaster position="top-right" reverseOrder={false} />
+        <AuthProvider>
+          <ManagementProvider>
+            <Router>
             <Routes>
             {/* Auth Routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignUpPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             
             {/* User Routes */}
             <Route path="/" element={<HomePage />} />
@@ -108,7 +117,7 @@ export default function App() {
             
             {/* Organizer Routes */}
             <Route path="/dashboard" element={
-              <RoleProtectedRoute allowedRoles={['ADMIN']}>
+              <RoleProtectedRoute allowedRoles={['ADMIN', 'ORGANIZER']}>
                 <OrganizerDashboard />
               </RoleProtectedRoute>
             } />
@@ -117,9 +126,10 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>
-        </ManagementProvider>
-      </AuthProvider>
-    </SettingsProvider>
-);
+          </ManagementProvider>
+        </AuthProvider>
+      </SettingsProvider>
+    </GlobalErrorBoundary>
+  );
 }
 

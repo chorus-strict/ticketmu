@@ -58,6 +58,17 @@ export const getPaymentHistory = async (req: AuthRequest, res: Response) => {
           paymentMethod: mOrder?.paymentMethod
         };
       }
+      if (payment.type === 'ORGANIZER_APPLICATION' && payment.referenceId) {
+        const order = await prisma.order.findUnique({
+          where: { id: payment.referenceId },
+          include: { paymentMethod: true }
+        });
+        return {
+          ...payment,
+          eventTitle: 'Organizer Activation',
+          paymentMethod: order?.paymentMethod
+        };
+      }
       return payment;
     }));
 
@@ -112,16 +123,17 @@ export const confirmPayment = async (req: AuthRequest, res: Response) => {
     });
 
     const user = await prisma.user.findUnique({ where: { id: order.userId } });
-    const event = await prisma.event.findUnique({ where: { id: order.eventId } });
+    const event = order.eventId ? await prisma.event.findUnique({ where: { id: order.eventId } }) : null;
 
-    if (admins.length > 0 && user && event) {
+    if (admins.length > 0 && user) {
+      const subject = event ? `for ${event.title}` : 'for Organizer Activation';
       await Promise.all(admins.map(admin => 
         prisma.notification.create({
           data: {
             userId: admin.id,
             title: 'Payment Confirmation Received',
-            message: `${user.name} confirmed payment for ${event.title} (${order.paymentMethod?.name || 'Manual Bank'})`,
-            link: '/dashboard?tab=PAYMENTS',
+            message: `${user.name} confirmed payment ${subject} (${order.paymentMethod?.name || 'Manual Bank'})`,
+            link: order.type === 'ORGANIZER_ACTIVATION' ? '/dashboard?tab=ORGANIZERS' : '/dashboard?tab=PAYMENTS',
             roleTarget: 'ADMIN',
             type: 'ORDER'
           }

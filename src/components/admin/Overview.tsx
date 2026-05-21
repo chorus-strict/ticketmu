@@ -29,6 +29,7 @@ import {
   Legend
 } from 'recharts';
 import { useManagement } from '../../contexts/ManagementContext';
+import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 import DateFilter from './DateFilter';
 import { 
@@ -39,8 +40,21 @@ import {
 } from '../../lib/utils';
 
 export default function Overview() {
-  const { users, events, tickets, refreshData, isLoading: contextLoading } = useManagement();
+  const { user } = useAuth();
+  const { 
+    users, 
+    events, 
+    tickets, 
+    myEvents,
+    organizerStats,
+    organizerProfile,
+    refreshData, 
+    isLoading: contextLoading 
+  } = useManagement();
   
+  const isOrganizer = user?.role === 'ORGANIZER';
+  const isAdmin = user?.role === 'ADMIN';
+
   // Unified Date Filter State
   const [filterValue, setFilterValue] = useState<any>({ 
     mode: 'MONTH', 
@@ -78,14 +92,16 @@ export default function Overview() {
   const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
   const categories = useMemo(() => {
-    return ['All', ...new Set(events.map(e => e.category))];
-  }, [events]);
+    const list = isOrganizer ? myEvents : events;
+    return ['All', ...new Set(list.map(e => e.category))];
+  }, [events, myEvents, isOrganizer]);
 
   // Filtering Logic
   const filteredTickets = useMemo(() => {
-    return tickets.filter(t => {
+    const list = isOrganizer ? tickets : tickets; // Ticket management already filters for organizer in backend
+    return list.filter(t => {
       const matchCategory = categoryFilter === 'All' || t.event?.category === categoryFilter;
-      const tDate = new Date(t.purchaseDate);
+      const tDate = new Date(t.purchasedAt);
       
       let matchDate = true;
       if (filterValue.mode === 'MONTH' && filterValue.month) {
@@ -104,7 +120,8 @@ export default function Overview() {
   }, [tickets, categoryFilter, filterValue]);
 
   const filteredEvents = useMemo(() => {
-    return events.filter(e => {
+    const list = isOrganizer ? myEvents : events;
+    return list.filter(e => {
       const matchCategory = categoryFilter === 'All' || e.category === categoryFilter;
       const eDate = new Date(e.date);
       
@@ -130,7 +147,7 @@ export default function Overview() {
     const todayEnd = getJakartaEndOfDay();
     
     const todayTickets = tickets.filter(t => {
-      const d = new Date(t.purchaseDate);
+      const d = new Date(t.purchasedAt);
       return d >= todayStart && d <= todayEnd;
     });
     
@@ -147,7 +164,15 @@ export default function Overview() {
     const totalEvents = filteredEvents.length;
     const totalUsers = users.length;
     const totalTickets = filteredTickets.length;
-    const liveEvents = filteredEvents.filter(e => e.status === 'LIVE').length;
+
+    if (isOrganizer) {
+      return [
+        { label: 'Your Events', value: totalEvents.toString(), icon: <Calendar className="w-5 h-5" />, color: 'indigo' },
+        { label: 'Today Sales', value: todayStats.count.toString(), icon: <Activity className="w-5 h-5" />, color: 'amber', sub: `Rp ${(todayStats.revenue / 1000).toFixed(0)}k revenue` },
+        { label: 'Total Sold', value: totalTickets.toString(), icon: <TicketIcon className="w-5 h-5" />, color: 'rose' },
+        { label: 'Revenue Share', value: `Rp ${(organizerStats?.totalRevenue || 0).toLocaleString()}`, icon: <TrendingUp className="w-5 h-5" />, color: 'emerald', sub: `Balance: Rp ${(organizerStats?.balance || 0).toLocaleString()}` },
+      ];
+    }
 
     return [
       { label: 'Platform Events', value: totalEvents.toString(), icon: <Calendar className="w-5 h-5" />, color: 'indigo' },
@@ -155,11 +180,12 @@ export default function Overview() {
       { label: 'Passes Sold', value: totalTickets.toString(), icon: <TicketIcon className="w-5 h-5" />, color: 'rose' },
       { label: 'Platform Users', value: totalUsers.toString(), icon: <Users className="w-5 h-5" />, color: 'emerald' },
     ];
-  }, [filteredEvents, filteredTickets, users, todayStats]);
+  }, [filteredEvents, filteredTickets, users, todayStats, isOrganizer, organizerStats]);
 
   const totalRevenue = useMemo(() => {
+    if (isOrganizer) return organizerStats?.totalRevenue || 0;
     return analyticsData.reduce((sum, item) => sum + item.revenue, 0);
-  }, [analyticsData]);
+  }, [analyticsData, isOrganizer, organizerStats]);
 
   // Data for Revenue (Daily or Monthly)
   const revenueChartData = useMemo(() => {
@@ -198,6 +224,18 @@ export default function Overview() {
     return Object.entries(distribution).map(([name, value]) => ({ name, value }));
   }, [filteredEvents]);
 
+  // Data for Ticket Status Distribution
+  const ticketStatusData = useMemo(() => {
+    const distribution: { [key: string]: number } = { ACTIVE: 0, USED: 0, EXPIRED: 0, CANCELLED: 0 };
+    filteredTickets.forEach(t => {
+      if (t.ticketStatus) {
+        distribution[t.ticketStatus] = (distribution[t.ticketStatus] || 0) + 1;
+      }
+    });
+
+    return Object.entries(distribution).map(([name, value]) => ({ name, value }));
+  }, [filteredTickets]);
+
   // Top Events by Tickets Sold
   const topEventsData = useMemo(() => {
     const eventSales: { [key: string]: { title: string; sold: number } } = {};
@@ -229,8 +267,12 @@ export default function Overview() {
       {/* Header & Tools */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
         <div>
-          <h2 className="text-2xl font-display font-extrabold text-slate-900 dark:text-white uppercase italic tracking-tighter">Ecosystem Insights</h2>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Platform analytics and performance metrics</p>
+          <h2 className="text-2xl font-display font-extrabold text-slate-900 dark:text-white uppercase italic tracking-tighter">
+            {isOrganizer ? 'Organizer Hub' : 'Ecosystem Insights'}
+          </h2>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+            {isOrganizer ? 'Track your event performance and earnings' : 'Platform analytics and performance metrics'}
+          </p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
@@ -390,8 +432,12 @@ export default function Overview() {
             </div>
             <div className="mt-4 flex items-center justify-between">
               <div>
-                <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{events.length}</p>
-                <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 tracking-widest">Total Managed</p>
+                <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">
+                  {isOrganizer ? myEvents.length : events.length}
+                </p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 tracking-widest">
+                  {isOrganizer ? 'My Events' : 'Total Managed'}
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-sm font-black text-emerald-500 tracking-tighter">+12%</p>
@@ -403,20 +449,36 @@ export default function Overview() {
           <div className="bg-slate-900 p-8 rounded-[3rem] text-white">
             <div className="flex items-center gap-2 mb-6">
                <Activity className="w-5 h-5 text-indigo-500" />
-               <span className="text-[10px] font-black uppercase tracking-[0.3em]">Audience Mood</span>
+               <span className="text-[10px] font-black uppercase tracking-[0.3em]">{isOrganizer ? 'Organizer Info' : 'Audience Mood'}</span>
             </div>
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pro Members</span>
-                 <span className="text-xs font-black text-white">{users.filter(u => u.membership === 'MEMBER').length}</span>
+            {isOrganizer ? (
+              <div className="space-y-6">
+                <div>
+                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Company</p>
+                   <p className="text-sm font-black italic">{organizerProfile?.companyName}</p>
+                </div>
+                <div>
+                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Bank Node</p>
+                   <p className="text-xs font-bold">{organizerProfile?.bankName} • {organizerProfile?.bankAccount}</p>
+                </div>
+                <div className="pt-4 border-t border-white/10">
+                   <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest">Revenue is automatically split 90/10 after each successful order approval.</p>
+                </div>
               </div>
-              <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                 <div 
-                   className="h-full bg-indigo-500" 
-                   style={{ width: `${(users.filter(u => u.membership === 'MEMBER').length / users.length) * 100}%` }}
-                 ></div>
+            ) : (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pro Members</span>
+                  <span className="text-xs font-black text-white">{users.filter(u => u.membership === 'PREMIUM').length}</span>
+                </div>
+                <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-indigo-500" 
+                    style={{ width: `${(users.filter(u => u.membership === 'PREMIUM').length / Math.max(1, users.length)) * 100}%` }}
+                  ></div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

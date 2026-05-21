@@ -4,7 +4,7 @@ import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
-router.use(authenticate, authorize(['ADMIN']));
+router.use(authenticate, authorize(['ADMIN', 'ORGANIZER']));
 
 router.get('/daily', getDailyAnalytics);
 router.get('/monthly', getMonthlyAnalytics);

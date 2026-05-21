@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { translations, Language, TranslationKey } from '../locales/translations';
+import { safeStorage } from '../lib/safeStorage';
 
 interface SettingsContextType {
   theme: 'light' | 'dark';
@@ -13,11 +14,11 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (localStorage.getItem('app_theme') as 'light' | 'dark') || 'light';
+    return (safeStorage.getItem('app_theme') as 'light' | 'dark') || 'light';
   });
 
   const [language, setLanguageState] = useState<Language>(() => {
-    return (localStorage.getItem('app_lang') as Language) || 'en';
+    return (safeStorage.getItem('app_lang') as Language) || 'en';
   });
 
   useEffect(() => {
@@ -29,11 +30,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       document.documentElement.classList.remove('dark');
       document.documentElement.style.colorScheme = 'light';
     }
-    localStorage.setItem('app_theme', theme);
+    safeStorage.setItem('app_theme', theme);
   }, [theme]);
 
   useEffect(() => {
-    localStorage.setItem('app_lang', language);
+    safeStorage.setItem('app_lang', language);
   }, [language]);
 
   const toggleTheme = () => {

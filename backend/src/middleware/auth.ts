@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { prisma } from '../lib/prisma';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
@@ -10,7 +11,7 @@ export interface AuthRequest extends Request {
   };
 }
 
-export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const token = req.headers.authorization?.split(' ')[1];
 
   if (!token) {
@@ -19,6 +20,17 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { id: string; role: string };
+    
+    // Verify user still exists in the database (e.g., after DB reset/seeding)
+    const userExists = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { id: true, role: true }
+    });
+
+    if (!userExists) {
+      return res.status(401).json({ message: 'User account no longer exists. Please register or log in again.' });
+    }
+
     req.user = decoded;
     next();
   } catch (error) {

@@ -64,7 +64,20 @@ export const getUserRewards = async (req: AuthRequest, res: Response) => {
 export const adjustPoints = async (req: AuthRequest, res: Response) => {
   try {
     const { userId, points, description } = req.body;
-    await PointsService.adjustPoints(req.user!.id, userId, points, description);
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+    const parsedPoints = parseInt(points, 10);
+    if (isNaN(parsedPoints)) {
+      return res.status(400).json({ message: 'Points must be a valid integer' });
+    }
+    if (parsedPoints === 0) {
+      return res.status(400).json({ message: 'Adjustment amount cannot be zero' });
+    }
+    if (!description || !description.trim()) {
+      return res.status(400).json({ message: 'Description/reason is required' });
+    }
+    await PointsService.adjustPoints(req.user!.id, userId, parsedPoints, description.trim());
     res.json({ message: 'Points adjusted successfully' });
   } catch (error: any) {
     res.status(400).json({ message: error.message });

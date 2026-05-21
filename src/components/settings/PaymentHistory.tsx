@@ -149,6 +149,8 @@ export default function PaymentHistory() {
                <div className="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform duration-500">
                  {payment.type === 'MEMBERSHIP' ? (
                    <Sparkles className="w-8 h-8 text-amber-500" />
+                 ) : payment.type === 'ORGANIZER_APPLICATION' ? (
+                   <ShoppingBag className="w-8 h-8 text-indigo-600" />
                  ) : (
                    <TicketIcon className="w-8 h-8 text-indigo-600" />
                  )}
@@ -164,7 +166,9 @@ export default function PaymentHistory() {
                      </span>
                   </div>
                   <h4 className="text-lg font-display font-black text-slate-900 dark:text-white uppercase italic truncate group-hover:text-indigo-600 transition-colors">
-                    {payment.type === 'MEMBERSHIP' ? 'Membership Upgrade' : (payment.eventTitle || 'Ticket Purchase')}
+                    {payment.type === 'MEMBERSHIP' ? 'Membership Upgrade' : 
+                     payment.type === 'ORGANIZER_APPLICATION' ? 'Organizer Activation' : 
+                     (payment.eventTitle || 'Ticket Purchase')}
                   </h4>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Reference ID: #{payment.id.slice(-8).toUpperCase()}</p>
                </div>
@@ -176,7 +180,9 @@ export default function PaymentHistory() {
                     {formatCurrency(payment.amount)}
                   </p>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    {payment.type === 'MEMBERSHIP' ? 'Premium Tier' : 'Event Entry'}
+                    {payment.type === 'MEMBERSHIP' ? 'Premium Tier' : 
+                     payment.type === 'ORGANIZER_APPLICATION' ? 'Professional Hub' : 
+                     'Event Entry'}
                   </p>
                </div>
 
@@ -188,7 +194,7 @@ export default function PaymentHistory() {
                   {payment.status === 'PENDING' ? (
                     <Link 
                       to={payment.type === 'MEMBERSHIP' ? "/membership/payment" : "/payment"}
-                      state={payment.type === 'TICKET' ? { orderId: payment.referenceId } : undefined}
+                      state={{ orderId: payment.referenceId }}
                       className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all active:scale-95"
                     >
                        <ExternalLink className="w-4 h-4" />

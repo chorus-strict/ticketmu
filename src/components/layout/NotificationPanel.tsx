@@ -93,15 +93,15 @@ export default function NotificationPanel({ isOpen, onClose, triggerRef }: Notif
     >
       {/* Type Icon */}
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
-        notif.message.toLowerCase().includes('rejected') || notif.message.toLowerCase().includes('failed')
+        (notif?.message || '').toLowerCase().includes('rejected') || (notif?.message || '').toLowerCase().includes('failed')
         ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30' 
-        : notif.message.toLowerCase().includes('approved') || notif.message.toLowerCase().includes('success')
+        : (notif?.message || '').toLowerCase().includes('approved') || (notif?.message || '').toLowerCase().includes('success')
         ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30'
         : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30'
       }`}>
-        {notif.message.toLowerCase().includes('rejected') || notif.message.toLowerCase().includes('failed') 
+        {(notif?.message || '').toLowerCase().includes('rejected') || (notif?.message || '').toLowerCase().includes('failed') 
           ? <X className="w-5 h-5" /> 
-          : notif.message.toLowerCase().includes('approved') || notif.message.toLowerCase().includes('success')
+          : (notif?.message || '').toLowerCase().includes('approved') || (notif?.message || '').toLowerCase().includes('success')
           ? <CheckCircle2 className="w-5 h-5" />
           : <Bell className="w-5 h-5" />}
       </div>

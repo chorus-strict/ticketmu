@@ -10,9 +10,9 @@ router.get('/spotlight', getSpotlightEvents);
 router.get('/search', getEvents); // Point search to getEvents as it handles q=
 router.get('/:id', getEventById);
 
-// Protected Admin Routes
-router.post('/', authenticate, authorize(['ADMIN']), createEvent);
-router.put('/:id', authenticate, authorize(['ADMIN']), updateEvent);
-router.delete('/:id', authenticate, authorize(['ADMIN']), deleteEvent);
+// Protected Admin & Organizer Routes
+router.post('/', authenticate, authorize(['ADMIN', 'ORGANIZER']), createEvent);
+router.put('/:id', authenticate, authorize(['ADMIN', 'ORGANIZER']), updateEvent);
+router.delete('/:id', authenticate, authorize(['ADMIN', 'ORGANIZER']), deleteEvent);
 
 export default router;
